@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Voltbase SDK Demo</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 2rem;
+        background: #0a0a0a;
+        color: #e5e5e5;
+      }
+      h1 {
+        color: #22c55e;
+        margin-bottom: 1rem;
+      }
+      h2 {
+        color: #86efac;
+        margin-top: 1.5rem;
+        font-size: 1rem;
+      }
+      pre {
+        background: #1a1a1a;
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-size: 0.8rem;
+      }
+      button {
+        background: #22c55e;
+        color: #000;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: monospace;
+        font-weight: bold;
+      }
+      button:hover {
+        background: #16a34a;
+      }
+      input {
+        background: #1a1a1a;
+        color: #e5e5e5;
+        border: 1px solid #333;
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-family: monospace;
+        width: min(100%, 520px);
+      }
+      .event {
+        padding: 0.5rem;
+        border-left: 3px solid #22c55e;
+        margin-bottom: 0.5rem;
+        font-size: 0.75rem;
+      }
+      .INSERT {
+        border-color: #22c55e;
+      }
+      .UPDATE {
+        border-color: #eab308;
+      }
+      .DELETE {
+        border-color: #ef4444;
+      }
+      .hint {
+        color: #888;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>⚡ Voltbase SDK Demo</h1>
+
+    <p>Open this page in two tabs. Subscribe in one, insert in the other.</p>
+
+    <div style="margin-bottom: 1rem">
+      <input
+        id="projectUrl"
+        placeholder="Project URL"
+        value="http://localhost:3000/api/projects/YOUR_PROJECT_SLUG"
+      />
+      <p class="hint">Copy from Dashboard → API → Project URL</p>
+      <br /><br />
+      <input id="apiKey" placeholder="API key (service role for insert)" />
+      <p class="hint">Service role for writes · anon key for read + realtime</p>
+      <br /><br />
+      <button type="button" onclick="init()">Connect</button>
+    </div>
+
+    <div id="app" style="display: none">
+      <h2>📋 DB — Insert into products</h2>
+      <input id="productName" placeholder="Product name" />
+      <button type="button" onclick="insertRow()">Insert</button>
+      <pre id="insertResult">—</pre>
+
+      <h2>📋 DB — Query products</h2>
+      <button type="button" onclick="queryRows()">Fetch all</button>
+      <pre id="queryResult">—</pre>
+
+      <h2>⚡ Realtime — products</h2>
+      <button type="button" onclick="subscribeRealtime()">Subscribe</button>
+      <button
+        type="button"
+        onclick="unsubscribeRealtime()"
+        style="background: #ef4444; margin-left: 0.5rem"
+      >
+        Unsubscribe
+      </button>
+      <div id="events" style="margin-top: 0.5rem"></div>
+
+      <h2>📁 Storage — list bucket</h2>
+      <input
+        id="bucketName"
+        placeholder="Bucket name (create in dashboard first)"
+      />
+      <button type="button" onclick="listFiles()">List files</button>
+      <pre id="storageResult">—</pre>
+      <h2>🔐 Auth — Sign up / Sign in</h2>
+      <input id="authEmail" type="email" placeholder="Email" />
+      <input id="authPassword" type="password" placeholder="Password (min 8)" />
+      <button type="button" onclick="signUp()">Sign Up</button>
+      <button type="button" onclick="signIn()">Sign In</button>
+      <pre id="authResult">—</pre>
+    </div>
+
+    <script type="module">
+      import { createClient } from '../dist/index.mjs';
+
+      let voltbase;
+      let unsubscribe;
+
+      window.init = function () {
+        const projectUrl = document.getElementById('projectUrl').value.trim();
+        const apiKey = document.getElementById('apiKey').value.trim();
+        voltbase = createClient(projectUrl, apiKey);
+        document.getElementById('app').style.display = 'block';
+        console.log('✅ Voltbase client initialized');
+      };
+
+      window.insertRow = async function () {
+        const name = document.getElementById('productName').value.trim();
+        if (!name) return;
+
+        const { data, error } = await voltbase
+          .from('products')
+          .insert({ name });
+
+        document.getElementById('insertResult').textContent = error
+          ? `Error: ${error}`
+          : JSON.stringify(data, null, 2);
+      };
+
+      window.queryRows = async function () {
+        const { data, error } = await voltbase
+          .from('products')
+          .select('*')
+          .order('created_at', 'desc')
+          .limit(10);
+
+        document.getElementById('queryResult').textContent = error
+          ? `Error: ${error}`
+          : JSON.stringify(data, null, 2);
+      };
+
+      window.subscribeRealtime = function () {
+        unsubscribe = voltbase.realtime.subscribe('products', (event) => {
+          const div = document.createElement('div');
+          div.className = `event ${event.type}`;
+          div.textContent = `[${event.type}] ${JSON.stringify(event.record)}`;
+          document.getElementById('events').prepend(div);
+        });
+        console.log('✅ Subscribed to products');
+      };
+
+      window.unsubscribeRealtime = function () {
+        unsubscribe?.();
+        console.log('✅ Unsubscribed');
+      };
+
+      window.listFiles = async function () {
+        const bucketName = document.getElementById('bucketName').value.trim();
+        if (!bucketName) return;
+
+        const { data, error } = await voltbase.storage.from(bucketName).list();
+
+        document.getElementById('storageResult').textContent = error
+          ? `Error: ${error}`
+          : JSON.stringify(data, null, 2);
+      };
+
+      window.signUp = async function () {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        const { data, error } = await voltbase.auth.signUp({ email, password });
+        document.getElementById('authResult').textContent = error
+          ? `Error: ${error}`
+          : JSON.stringify(data, null, 2);
+      };
+
+      window.signIn = async function () {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        const { data, error } = await voltbase.auth.signIn({ email, password });
+        document.getElementById('authResult').textContent = error
+          ? `Error: ${error}`
+          : JSON.stringify(data, null, 2);
+      };
+    </script>
+  </body>
+</html>
