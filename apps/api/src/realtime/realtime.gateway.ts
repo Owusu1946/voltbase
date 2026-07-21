@@ -25,7 +25,7 @@ type SocketCallbackEntry = {
 @WebSocketGateway({
   namespace: '/realtime',
   cors: {
-    origin: process.env.WEB_URL ?? 'http://localhost:3001',
+    origin: (process.env.WEB_URL ?? 'http://localhost:3001').replace(/\/$/, ''),
     credentials: true,
   },
 })
