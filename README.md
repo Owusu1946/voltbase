@@ -52,11 +52,14 @@ Order: **Railway (API) first**, then **Vercel (web)**, then update both with the
 1. [vercel.com](https://vercel.com) → Add New Project → import `Owusu1946/voltbase`
 2. **Root Directory:** `apps/web` (Important)
 3. Framework: Next.js — [`apps/web/vercel.json`](apps/web/vercel.json) sets install/build for the monorepo
-4. Environment variables from [`apps/web/.env.example`](apps/web/.env.example):
+4. In Project Settings → General / Build & Development:
+   - Do **not** override Install/Build in the dashboard (use `vercel.json`)
+   - Do **not** set `ENABLE_EXPERIMENTAL_COREPACK` (it conflicts with our install)
+5. Environment variables from [`apps/web/.env.example`](apps/web/.env.example):
    - `API_URL` / `NEXT_PUBLIC_API_URL` = `https://YOUR-RAILWAY-DOMAIN/api`
    - `NEXT_PUBLIC_WEB_URL` = your Vercel URL
    - `JWT_ACCESS_SECRET` = **same value** as on Railway
-5. Deploy
+6. Deploy
 
 ### 3. Wire URLs together
 
