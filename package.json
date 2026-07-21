@@ -1,8 +1,12 @@
 {
   "name": "voltbase",
   "private": true,
+  "packageManager": "pnpm@10.4.1",
   "scripts": {
     "build:packages": "pnpm --filter @voltbase/constants --filter @voltbase/types run build",
+    "build:api": "pnpm run build:packages && pnpm --filter api build",
+    "start:api": "pnpm --filter api start:prod",
+    "build:web": "pnpm run build:packages && pnpm --filter web build",
     "dev:api": "pnpm run build:packages && pnpm --filter api run start:dev",
     "dev:web": "pnpm --filter web run dev",
     "dev": "pnpm run build:packages && concurrently \"pnpm --filter api run start:dev\" \"pnpm run dev:web\""
