@@ -1,10 +1,12 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import { TriggerService } from './trigger.service';
 import type { RealtimeEvent } from '@voltbase/types';
 
-neonConfig.webSocketConstructor = WebSocket;
+// Neon serverless needs a WebSocket impl in Node (no global WebSocket on Node 18)
+neonConfig.webSocketConstructor = ws;
 
 type NotifyCallback = (event: RealtimeEvent) => void;
 
