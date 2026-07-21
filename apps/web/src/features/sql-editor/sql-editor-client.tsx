@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { Play, Clock, History, X } from 'lucide-react';
 import type { QueryResult, QueryHistoryItem } from '@voltbase/types';
+import { executeSqlAction } from './action';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -64,24 +65,14 @@ export function SqlEditorClient({
       setResult(null);
 
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/orgs/${orgSlug}/projects/${projectSlug}/sql`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ sql: query }),
-          },
-        );
+        const outcome = await executeSqlAction(orgSlug, projectSlug, query);
 
-        const data = (await res.json()) as QueryResult | { message: string };
-
-        if (!res.ok) {
-          setError((data as { message: string }).message ?? 'Query failed');
+        if (!outcome.ok) {
+          setError(outcome.error);
           return;
         }
 
-        const queryResult = data as QueryResult;
+        const queryResult = outcome.data;
         setResult(queryResult);
 
         setHistory((prev) => [
