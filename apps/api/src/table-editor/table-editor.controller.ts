@@ -114,4 +114,31 @@ export class TableEditorController {
       body.updates,
     );
   }
+
+  @Post(':tableName/rows')
+  insertRow(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.tableEditorService.insertRow(slug, projectSlug, tableName, body);
+  }
+
+  @Delete(':tableName/rows/:pkValue')
+  deleteRow(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Param('pkValue') pkValue: string,
+    @Body() body: { pkColumn: string },
+  ) {
+    return this.tableEditorService.deleteRow(
+      slug,
+      projectSlug,
+      tableName,
+      body.pkColumn,
+      pkValue,
+    );
+  }
 }

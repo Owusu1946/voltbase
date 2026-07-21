@@ -14,3 +14,8 @@ export { VoltbaseRealtime } from './realtime';
 export type { RealtimeCallback } from './realtime';
 export { VoltbaseStorage } from './storage';
 export { VoltbaseAuth } from './auth';
+export type {
+  AuthResult,
+  AuthSession,
+  AuthChangeEvent,
+} from './auth';

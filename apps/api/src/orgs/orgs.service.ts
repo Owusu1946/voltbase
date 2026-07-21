@@ -5,10 +5,15 @@ import slugify from 'slugify';
 import { DrizzleService } from '../db/drizzle.service';
 import { organizations, orgMembers, projects } from '../db/schema';
 import { CreateOrgDto } from './dto/create-org.dto';
+import { UpdateOrgDto } from './dto/update-org.dto';
+import { ProjectsService } from '../projects/projects.service';
 
 @Injectable()
 export class OrgsService {
-  constructor(private drizzle: DrizzleService) {}
+  constructor(
+    private drizzle: DrizzleService,
+    private projectsService: ProjectsService,
+  ) {}
 
   private generateOrgSlug(name: string): string {
     const base = slugify(`${name}-org`, { lower: true, strict: true });
@@ -82,5 +87,48 @@ export class OrgsService {
     });
 
     return org;
+  }
+
+  async updateOrg(slug: string, dto: UpdateOrgDto) {
+    const [org] = await this.drizzle.db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.slug, slug))
+      .limit(1);
+
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const [updated] = await this.drizzle.db
+      .update(organizations)
+      .set({ name: dto.name, updatedAt: new Date() })
+      .where(eq(organizations.id, org.id))
+      .returning();
+
+    return updated;
+  }
+
+  async deleteOrg(slug: string) {
+    const [org] = await this.drizzle.db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.slug, slug))
+      .limit(1);
+
+    if (!org) throw new NotFoundException('Organization not found');
+
+    const orgProjects = await this.drizzle.db
+      .select()
+      .from(projects)
+      .where(eq(projects.orgId, org.id));
+
+    for (const project of orgProjects) {
+      await this.projectsService.deleteProjectRow(project);
+    }
+
+    await this.drizzle.db
+      .delete(organizations)
+      .where(eq(organizations.id, org.id));
+
+    return { ok: true };
   }
 }

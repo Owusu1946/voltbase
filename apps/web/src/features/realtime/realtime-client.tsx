@@ -10,6 +10,10 @@ import { Radio, Trash2, Table2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { REALTIME_EVENTS } from '@voltbase/constants';
 import type { RealtimeEvent } from '@voltbase/types';
+import {
+  disableRealtimeTableAction,
+  enableRealtimeTableAction,
+} from './action';
 
 interface RealtimeClientProps {
   orgSlug: string;
@@ -91,16 +95,13 @@ export function RealtimeClient({
       const socket = socketRef.current;
       if (!socket) return;
 
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
-
       if (enabled) {
-        const res = await fetch(
-          `${apiUrl}/orgs/${orgSlug}/projects/${projectSlug}/realtime/${tableName}/enable`,
-          { method: 'POST', credentials: 'include' },
+        const result = await enableRealtimeTableAction(
+          orgSlug,
+          projectSlug,
+          tableName,
         );
-
-        if (!res.ok) return;
+        if (!result.ok) return;
 
         socket.emit(REALTIME_EVENTS.SUBSCRIBE, tableName);
         setSubscribedTables((prev) => new Set([...prev, tableName]));
@@ -112,10 +113,7 @@ export function RealtimeClient({
           return next;
         });
 
-        await fetch(
-          `${apiUrl}/orgs/${orgSlug}/projects/${projectSlug}/realtime/${tableName}/disable`,
-          { method: 'DELETE', credentials: 'include' },
-        );
+        await disableRealtimeTableAction(orgSlug, projectSlug, tableName);
       }
     },
     [orgSlug, projectSlug],

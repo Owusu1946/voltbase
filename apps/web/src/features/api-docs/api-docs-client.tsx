@@ -1,19 +1,57 @@
 'use client';
 
-import { useState } from 'react';
-import { Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import { Eye, EyeOff, Copy, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ProjectApiDocs } from '@voltbase/types';
+import { PROJECT_KEY_ROLES } from '@voltbase/constants';
+import { rotateProjectKeyAction } from './rotate-key-action';
 
-export function ApiDocsClient({ docs }: { docs: ProjectApiDocs }) {
+export function ApiDocsClient({
+  docs: initialDocs,
+  orgSlug,
+  projectSlug,
+}: {
+  docs: ProjectApiDocs;
+  orgSlug: string;
+  projectSlug: string;
+}) {
+  const [docs, setDocs] = useState(initialDocs);
   const [showAnonKey, setShowAnonKey] = useState(false);
   const [showServiceKey, setShowServiceKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [rotatedOnce, setRotatedOnce] = useState<{
+    role: string;
+    key: string;
+  } | null>(null);
+  const [rotateError, setRotateError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const copyToClipboard = async (text: string, key: string) => {
     await navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const rotate = (
+    role: typeof PROJECT_KEY_ROLES.ANON | typeof PROJECT_KEY_ROLES.SERVICE_ROLE,
+  ) => {
+    setRotateError(null);
+    startTransition(async () => {
+      const result = await rotateProjectKeyAction(orgSlug, projectSlug, role);
+      if (!result.ok) {
+        setRotateError(result.error);
+        return;
+      }
+      setRotatedOnce({ role: result.data.role, key: result.data.key });
+      if (role === PROJECT_KEY_ROLES.ANON) {
+        setDocs((prev) => ({ ...prev, anonKey: result.data.key }));
+        setShowAnonKey(true);
+      } else {
+        setDocs((prev) => ({ ...prev, serviceRoleKey: result.data.key }));
+        setShowServiceKey(true);
+      }
+    });
   };
 
   const methodColors: Record<string, string> = {
@@ -36,6 +74,16 @@ export function ApiDocsClient({ docs }: { docs: ProjectApiDocs }) {
         <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
           API Keys
         </h2>
+
+        {rotatedOnce ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            New {rotatedOnce.role} key generated. Copy it now — the previous key
+            no longer works.
+          </div>
+        ) : null}
+        {rotateError ? (
+          <p className="text-sm text-destructive">{rotateError}</p>
+        ) : null}
 
         <div className="space-y-1 rounded-xl border border-border p-4">
           <p className="text-xs text-muted-foreground">Project URL</p>
@@ -86,6 +134,16 @@ export function ApiDocsClient({ docs }: { docs: ProjectApiDocs }) {
                   <Copy size={12} />
                 )}
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                disabled={isPending}
+                onClick={() => rotate(PROJECT_KEY_ROLES.ANON)}
+              >
+                <RefreshCw size={12} />
+                Rotate
+              </Button>
             </div>
           </div>
         </div>
@@ -123,6 +181,16 @@ export function ApiDocsClient({ docs }: { docs: ProjectApiDocs }) {
                 ) : (
                   <Copy size={12} />
                 )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                disabled={isPending}
+                onClick={() => rotate(PROJECT_KEY_ROLES.SERVICE_ROLE)}
+              >
+                <RefreshCw size={12} />
+                Rotate
               </Button>
             </div>
           </div>

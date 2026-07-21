@@ -269,7 +269,7 @@ export function AppSidebar({ orgs, user }: AppSidebarProps) {
               >
                 <DropdownMenuItem asChild>
                   <Link
-                    href={`/organizations/${orgSlug ?? currentOrg?.slug}/settings/members`}
+                    href={`/organizations/${orgSlug ?? currentOrg?.slug}/settings`}
                   >
                     Settings
                   </Link>

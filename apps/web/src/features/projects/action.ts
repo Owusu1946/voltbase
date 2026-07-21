@@ -1,5 +1,6 @@
 'use server';
 
+import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { projectsServerSchema } from './server.schema';
 import { PROJECTS_INTENT } from './constants';
@@ -25,22 +26,41 @@ export async function projectsAction(
   }
 
   const token = await retrieveTokenFromCookie();
-  const { intent, ...data } = parsed.data;
+  const headers = { Cookie: `${COOKIE_KEYS.ACCESS_TOKEN}=${token}` };
+  const { intent } = parsed.data;
 
   try {
     switch (intent) {
       case PROJECTS_INTENT.CREATE: {
         await apiClient.post(
           `/orgs/${slug}/projects`,
-          { name: (data as { name: string }).name },
-          { headers: { Cookie: `${COOKIE_KEYS.ACCESS_TOKEN}=${token}` } },
+          { name: parsed.data.name },
+          { headers },
         );
         revalidatePath(`/organizations/${slug}/projects`);
         return { success: 'Project created!' };
       }
+      case PROJECTS_INTENT.UPDATE: {
+        await apiClient.patch(
+          `/orgs/${slug}/projects/${parsed.data.projectSlug}`,
+          { name: parsed.data.name },
+          { headers },
+        );
+        revalidatePath(`/organizations/${slug}/projects`);
+        return { success: 'Project renamed' };
+      }
+      case PROJECTS_INTENT.DELETE: {
+        await apiClient.delete(
+          `/orgs/${slug}/projects/${parsed.data.projectSlug}`,
+          { headers },
+        );
+        revalidatePath(`/organizations/${slug}/projects`);
+        redirect(`/organizations/${slug}/projects`);
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
+    if (err?.digest?.startsWith?.('NEXT_REDIRECT')) throw err;
     return { error: err.response?.data?.message ?? 'Something went wrong' };
   }
 }

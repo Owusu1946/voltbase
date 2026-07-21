@@ -1,6 +1,17 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
+import { RotateKeyDto } from './dto/rotate-key.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrgRoleGuard } from '../auth/guards/org-role.guard';
 import { RequireOrgRole } from '../auth/decorators/require-org-role.decorator';
@@ -30,5 +41,34 @@ export class ProjectsController {
   @RequireOrgRole('admin')
   createProject(@Param('slug') slug: string, @Body() dto: CreateProjectDto) {
     return this.projectsService.createProject(slug, dto);
+  }
+
+  @Patch(':projectSlug')
+  @RequireOrgRole('admin')
+  updateProject(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: UpdateProjectDto,
+  ) {
+    return this.projectsService.updateProject(slug, projectSlug, dto);
+  }
+
+  @Delete(':projectSlug')
+  @RequireOrgRole('admin')
+  deleteProject(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+  ) {
+    return this.projectsService.deleteProject(slug, projectSlug);
+  }
+
+  @Post(':projectSlug/keys/rotate')
+  @RequireOrgRole('admin')
+  rotateKey(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: RotateKeyDto,
+  ) {
+    return this.projectsService.rotateProjectKey(slug, projectSlug, dto.role);
   }
 }

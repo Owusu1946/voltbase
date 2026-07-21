@@ -89,6 +89,21 @@ export async function tableEditorAction(
         );
         return { success: 'Column added!', tableName };
       }
+
+      case TABLE_EDITOR_INTENT.INSERT_ROW: {
+        const { tableName, values } = parsed.data;
+        await apiClient.post(`${base}/${tableName}/rows`, values, opts);
+        return { success: 'Row inserted!', tableName };
+      }
+
+      case TABLE_EDITOR_INTENT.DELETE_ROW: {
+        const { tableName, pkColumn, pkValue } = parsed.data;
+        await apiClient.delete(`${base}/${tableName}/rows/${pkValue}`, {
+          ...opts,
+          data: { pkColumn },
+        });
+        return { success: 'Row deleted!', tableName };
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {

@@ -111,10 +111,22 @@ voltbase.auth.signInWithGoogle();
 voltbase.auth.signInWithGithub();
 
 // Session helpers
+voltbase.auth.getSession(); // { accessToken, user } | null
+voltbase.auth.setSession({ accessToken });
 voltbase.auth.getAccessToken(); // string | null
 voltbase.auth.getUser(); // { id, email } | null
 voltbase.auth.signOut();
+
+// Listen for sign-in / sign-out / initial hydrate
+const unsubscribe = voltbase.auth.onAuthStateChange((event, session) => {
+  console.log(event, session);
+});
 ```
+
+Sessions persist in `localStorage` (`voltbase.auth.token`) and hydrate on construct.
+OAuth / magic-link redirects that land with `?access_token=…` are picked up automatically.
+
+**Limitation:** there is no refresh-token flow yet. Project-auth JWTs last 7 days; after expiry the user must sign in again.
 
 ---
 

@@ -44,6 +44,7 @@ import {
   Table2,
   X,
   ChevronLeft,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TableInfo } from '@voltbase/types';
@@ -51,6 +52,7 @@ import { tableEditorAction } from '@/features/table-editor/action';
 import { TABLE_EDITOR_INTENT } from '@voltbase/constants';
 import { CreateTableDrawer } from './create-table-drawer';
 import { AddColumnDialog } from './add-column-dialog';
+import { InsertRowDialog } from './insert-row-dialog';
 
 interface TableEditorClientProps {
   orgSlug: string;
@@ -322,27 +324,67 @@ export function TableEditorClient({
             </SheetTitle>
           </SheetHeader>
           {expandedRow && currentTab?.info && (
-            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-              {currentTab.info.columns.map((col) => (
-                <div key={col.name} className="space-y-1">
-                  <p className="text-sm font-medium">{col.name}</p>
-                  <p className="text-xs text-muted-foreground">{col.type}</p>
-                  {col.foreignKey && (
-                    <p className="text-xs text-muted-foreground">
-                      Foreign key →{' '}
-                      <span className="font-mono">
-                        {col.foreignKey.table}.{col.foreignKey.column}
-                      </span>
-                    </p>
-                  )}
-                  <Input
-                    readOnly
-                    defaultValue={String(expandedRow[col.name] ?? '')}
-                    className="font-mono text-xs bg-muted/40"
-                  />
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                {currentTab.info.columns.map((col) => (
+                  <div key={col.name} className="space-y-1">
+                    <p className="text-sm font-medium">{col.name}</p>
+                    <p className="text-xs text-muted-foreground">{col.type}</p>
+                    {col.foreignKey && (
+                      <p className="text-xs text-muted-foreground">
+                        Foreign key →{' '}
+                        <span className="font-mono">
+                          {col.foreignKey.table}.{col.foreignKey.column}
+                        </span>
+                      </p>
+                    )}
+                    <Input
+                      readOnly
+                      defaultValue={String(expandedRow[col.name] ?? '')}
+                      className="font-mono text-xs bg-muted/40"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="border-t px-4 py-3">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full gap-1.5"
+                  onClick={() => {
+                    void (async () => {
+                      const pk = currentTab.info?.columns.find(
+                        (c) => c.isPrimaryKey,
+                      );
+                      if (!pk || !activeTab || !expandedRow) return;
+                      const pkValue = expandedRow[pk.name];
+                      if (pkValue === null || pkValue === undefined) return;
+
+                      const formData = new FormData();
+                      formData.set('intent', TABLE_EDITOR_INTENT.DELETE_ROW);
+                      formData.set('tableName', activeTab);
+                      formData.set('pkColumn', pk.name);
+                      formData.set('pkValue', String(pkValue));
+
+                      const result = await tableEditorAction(
+                        actionCtx,
+                        {},
+                        formData,
+                      );
+                      if (result.error) {
+                        window.alert(result.error);
+                        return;
+                      }
+                      setExpandedRow(null);
+                      void refreshTable(activeTab);
+                    })();
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Delete row
+                </Button>
+              </div>
+            </>
           )}
         </SheetContent>
       </Sheet>
@@ -682,6 +724,15 @@ function DataGrid({
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <InsertRowDialog
+          orgSlug={orgSlug}
+          projectSlug={projectSlug}
+          tableName={tableName}
+          tableInfo={tableInfo}
+          onInserted={onColumnAdded}
+        />
+      </div>
       <ScrollArea className="flex-1">
         <Table>
           <TableHeader className="sticky top-0 bg-background z-10">

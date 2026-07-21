@@ -42,6 +42,14 @@ import type {
   BucketAccess,
 } from '@voltbase/types';
 import { OurStorageRouter } from '../../../../api/src/storage/uploadthing';
+import {
+  createBucketAction,
+  deleteBucketAction,
+  deleteObjectAction,
+  getSignedUrlAction,
+  listBucketObjectsAction,
+  registerUploadedObjectAction,
+} from './action';
 
 interface StorageClientProps {
   orgSlug: string;
@@ -54,10 +62,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 }
 
 export function StorageClient({
@@ -80,74 +84,50 @@ export function StorageClient({
     useState<BucketAccess>('public');
   const [creating, setCreating] = useState(false);
 
-  const apiBase = getApiBaseUrl();
-  const storageBase = `${apiBase}/orgs/${orgSlug}/projects/${projectSlug}/storage`;
-  const apiOrigin = useMemo(() => new URL(apiBase).origin, [apiBase]);
-
-  const uploadFetch = useCallback(
-    (input: RequestInfo | URL, init?: RequestInit) => {
-      const href =
-        typeof input === 'string'
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
-      const isOurApi = new URL(href).origin === apiOrigin;
-      return fetch(input, {
-        ...init,
-        credentials: isOurApi ? 'include' : init?.credentials,
-      });
-    },
-    [apiOrigin],
-  );
-
   const uploadUrl = useMemo(() => {
     if (!activeBucket) return '';
-    return `${storageBase}/buckets/${activeBucket.id}/upload`;
-  }, [storageBase, activeBucket]);
+    return `/api/proxy/storage/orgs/${orgSlug}/projects/${projectSlug}/storage/buckets/${activeBucket.id}/upload`;
+  }, [orgSlug, projectSlug, activeBucket]);
 
   const loadObjects = useCallback(
     async (bucket: StorageBucket) => {
       setActiveBucket(bucket);
       setLoadingObjects(true);
       try {
-        const res = await fetch(`${storageBase}/buckets/${bucket.id}/objects`, {
-          credentials: 'include',
-        });
-        const data = (await res.json()) as StorageObject[];
-        setObjects(data);
+        const result = await listBucketObjectsAction(
+          orgSlug,
+          projectSlug,
+          bucket.id,
+        );
+        if (result.ok) setObjects(result.data);
       } finally {
         setLoadingObjects(false);
       }
     },
-    [storageBase],
+    [orgSlug, projectSlug],
   );
 
   const createBucket = async () => {
     if (!newBucketName.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch(`${storageBase}/buckets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name: newBucketName, access: newBucketAccess }),
+      const result = await createBucketAction(orgSlug, projectSlug, {
+        name: newBucketName,
+        access: newBucketAccess,
       });
-      const bucket = (await res.json()) as StorageBucket;
-      setBuckets((prev) => [...prev, bucket]);
+      if (!result.ok) return;
+      setBuckets((prev) => [...prev, result.data]);
       setCreateOpen(false);
       setNewBucketName('');
-      void loadObjects(bucket);
+      void loadObjects(result.data);
     } finally {
       setCreating(false);
     }
   };
 
   const deleteBucket = async (bucketId: string) => {
-    await fetch(`${storageBase}/buckets/${bucketId}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
+    const result = await deleteBucketAction(orgSlug, projectSlug, bucketId);
+    if (!result.ok) return;
     setBuckets((prev) => prev.filter((b) => b.id !== bucketId));
     if (activeBucket?.id === bucketId) {
       setActiveBucket(null);
@@ -156,10 +136,8 @@ export function StorageClient({
   };
 
   const deleteObject = async (objectId: string) => {
-    await fetch(`${storageBase}/objects/${objectId}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
+    const result = await deleteObjectAction(orgSlug, projectSlug, objectId);
+    if (!result.ok) return;
     setObjects((prev) => prev.filter((o) => o.id !== objectId));
   };
 
@@ -167,14 +145,13 @@ export function StorageClient({
     let url = object.url;
 
     if (!url) {
-      const res = await fetch(
-        `${storageBase}/objects/${object.id}/signed-url`,
-        {
-          credentials: 'include',
-        },
+      const result = await getSignedUrlAction(
+        orgSlug,
+        projectSlug,
+        object.id,
       );
-      const data = (await res.json()) as { url: string };
-      url = data.url;
+      if (!result.ok) return;
+      url = result.data.url;
     }
 
     await navigator.clipboard.writeText(url);
@@ -372,36 +349,28 @@ export function StorageClient({
                     <UploadButton<OurStorageRouter, 'bucketUploader'>
                       url={uploadUrl}
                       endpoint="bucketUploader"
-                      fetch={uploadFetch}
                       onUploadError={(error) => {
                         console.error('Upload failed:', error.message);
                       }}
                       onClientUploadComplete={async (files) => {
                         for (const file of files) {
-                          const res = await fetch(
-                            `${storageBase}/buckets/${activeBucket.id}/objects`,
+                          const result = await registerUploadedObjectAction(
+                            orgSlug,
+                            projectSlug,
+                            activeBucket.id,
                             {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              credentials: 'include',
-                              body: JSON.stringify({
-                                name: file.name,
-                                size: file.size,
-                                type: file.type ?? 'application/octet-stream',
-                                utKey: file.key,
-                                url: file.url,
-                              }),
+                              name: file.name,
+                              size: file.size,
+                              type: file.type ?? 'application/octet-stream',
+                              utKey: file.key,
+                              url: file.url,
                             },
                           );
-                          if (!res.ok) {
-                            console.error(
-                              'Failed to save file:',
-                              await res.text(),
-                            );
+                          if (!result.ok) {
+                            console.error('Failed to save file:', result.error);
                             continue;
                           }
-                          const object = (await res.json()) as StorageObject;
-                          setObjects((prev) => [object, ...prev]);
+                          setObjects((prev) => [result.data, ...prev]);
                         }
                       }}
                       appearance={{

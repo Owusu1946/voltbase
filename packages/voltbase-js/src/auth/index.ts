@@ -3,15 +3,111 @@ interface AuthUser {
   email: string;
 }
 
+export interface AuthSession {
+  accessToken: string;
+  user: AuthUser;
+}
+
 export interface AuthResult {
   data: { user: AuthUser; accessToken: string } | null;
   error: string | null;
 }
 
+export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'INITIAL_SESSION';
+
+const STORAGE_KEY = 'voltbase.auth.token';
+
+function canUseLocalStorage(): boolean {
+  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+}
+
+function decodeUser(token: string): AuthUser | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1])) as {
+      sub: string;
+      email: string;
+    };
+    return { id: payload.sub, email: payload.email };
+  } catch {
+    return null;
+  }
+}
+
 export class VoltbaseAuth {
   private currentToken: string | null = null;
+  private listeners = new Set<
+    (event: AuthChangeEvent, session: AuthSession | null) => void
+  >();
 
-  constructor(private projectUrl: string) {}
+  constructor(private projectUrl: string) {
+    this.hydrateFromStorage();
+    this.hydrateFromUrl();
+  }
+
+  private hydrateFromStorage(): void {
+    if (!canUseLocalStorage()) return;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    const user = decodeUser(stored);
+    if (!user) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    this.currentToken = stored;
+  }
+
+  private hydrateFromUrl(): void {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get('access_token');
+    if (!accessToken) return;
+
+    this.setSession({ accessToken });
+    params.delete('access_token');
+    const next = params.toString();
+    const url = `${window.location.pathname}${next ? `?${next}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', url);
+  }
+
+  private persistToken(token: string | null): void {
+    if (!canUseLocalStorage()) return;
+    if (token) localStorage.setItem(STORAGE_KEY, token);
+    else localStorage.removeItem(STORAGE_KEY);
+  }
+
+  private emit(event: AuthChangeEvent, session: AuthSession | null): void {
+    for (const listener of this.listeners) {
+      listener(event, session);
+    }
+  }
+
+  setSession(session: { accessToken: string }): AuthSession | null {
+    const user = decodeUser(session.accessToken);
+    if (!user) return null;
+
+    this.currentToken = session.accessToken;
+    this.persistToken(session.accessToken);
+    const next: AuthSession = { accessToken: session.accessToken, user };
+    this.emit('SIGNED_IN', next);
+    return next;
+  }
+
+  getSession(): AuthSession | null {
+    if (!this.currentToken) return null;
+    const user = decodeUser(this.currentToken);
+    if (!user) return null;
+    return { accessToken: this.currentToken, user };
+  }
+
+  onAuthStateChange(
+    callback: (event: AuthChangeEvent, session: AuthSession | null) => void,
+  ): () => void {
+    this.listeners.add(callback);
+    callback('INITIAL_SESSION', this.getSession());
+    return () => {
+      this.listeners.delete(callback);
+    };
+  }
 
   async signUp(credentials: {
     email: string;
@@ -35,7 +131,7 @@ export class VoltbaseAuth {
         user: AuthUser;
         accessToken: string;
       };
-      this.currentToken = data.accessToken;
+      this.setSession({ accessToken: data.accessToken });
       return { data, error: null };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Network error';
@@ -65,7 +161,7 @@ export class VoltbaseAuth {
         user: AuthUser;
         accessToken: string;
       };
-      this.currentToken = data.accessToken;
+      this.setSession({ accessToken: data.accessToken });
       return { data, error: null };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Network error';
@@ -99,20 +195,12 @@ export class VoltbaseAuth {
 
   signOut(): void {
     this.currentToken = null;
+    this.persistToken(null);
+    this.emit('SIGNED_OUT', null);
   }
 
   getUser(): AuthUser | null {
-    if (!this.currentToken) return null;
-
-    try {
-      const payload = JSON.parse(atob(this.currentToken.split('.')[1])) as {
-        sub: string;
-        email: string;
-      };
-      return { id: payload.sub, email: payload.email };
-    } catch {
-      return null;
-    }
+    return this.getSession()?.user ?? null;
   }
 
   getAccessToken(): string | null {

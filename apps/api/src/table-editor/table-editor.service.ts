@@ -361,4 +361,78 @@ export class TableEditorService {
           WHERE ${sql.identifier(pkColumn)} = ${pkValue}`,
     );
   }
+
+  private formatLiteral(value: unknown): string {
+    if (value === null || value === undefined || value === '') return 'NULL';
+    if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed === '') return 'NULL';
+      if (trimmed.toLowerCase() === 'true') return 'TRUE';
+      if (trimmed.toLowerCase() === 'false') return 'FALSE';
+      if (trimmed.toLowerCase() === 'null') return 'NULL';
+      return `'${value.replace(/'/g, "''")}'`;
+    }
+    if (typeof value === 'object') {
+      return `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`;
+    }
+    throw new BadRequestException('Unsupported column value');
+  }
+
+  async insertRow(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    values: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+
+    const entries = Object.entries(values).filter(
+      ([, v]) => v !== undefined && v !== '',
+    );
+    if (entries.length === 0) {
+      throw new BadRequestException('Request body cannot be empty');
+    }
+
+    entries.forEach(([col]) => this.assertSafeIdentifier(col, 'column name'));
+
+    const columns = entries.map(([c]) => `"${c}"`).join(', ');
+    const literals = entries.map(([, v]) => this.formatLiteral(v)).join(', ');
+
+    const result = await this.drizzle.db.execute<Record<string, unknown>>(
+      `INSERT INTO "${schema}"."${tableName}" (${columns})
+       VALUES (${literals})
+       RETURNING *`,
+    );
+
+    if (!result.rows[0]) {
+      throw new BadRequestException('Insert failed');
+    }
+    return result.rows[0];
+  }
+
+  async deleteRow(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    pkColumn: string,
+    pkValue: string,
+  ): Promise<Record<string, unknown>> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    this.assertSafeIdentifier(pkColumn, 'primary key column');
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+
+    const result = await this.drizzle.db.execute<Record<string, unknown>>(
+      `DELETE FROM "${schema}"."${tableName}"
+       WHERE "${pkColumn}" = ${this.formatLiteral(pkValue)}
+       RETURNING *`,
+    );
+
+    if (!result.rows[0]) throw new NotFoundException('Row not found');
+    return result.rows[0];
+  }
 }

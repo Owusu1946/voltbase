@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import type { ProjectOAuthSettings } from '@voltbase/types';
 import { ChevronRight, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { saveAuthSettingsAction } from './save-settings-action';
 
 function GithubIcon({ className }: { className?: string }) {
   return (
@@ -65,22 +66,12 @@ export function ProjectAuthProviders({
   function save() {
     setMessage(null);
     startTransition(async () => {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/orgs/${orgSlug}/projects/${projectSlug}/auth/settings`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(settings),
-        },
+      const result = await saveAuthSettingsAction(
+        orgSlug,
+        projectSlug,
+        settings,
       );
-
-      if (!res.ok) {
-        setMessage('Save failed');
-        return;
-      }
-
-      setMessage('Saved');
+      setMessage(result.ok ? 'Saved' : result.error);
     });
   }
 

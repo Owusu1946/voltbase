@@ -34,3 +34,14 @@ export const addColumnSchema = z.object({
   type: z.enum(COLUMN_TYPES),
   defaultValue: z.string().optional(),
 });
+
+export const insertRowSchema = z.object({
+  tableName: z.string().min(1),
+  values: z.string().min(1),
+});
+
+export const deleteRowSchema = z.object({
+  tableName: z.string().min(1),
+  pkColumn: z.string().min(1),
+  pkValue: z.string().min(1),
+});

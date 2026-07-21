@@ -1,5 +1,7 @@
 export const PROJECTS_INTENT = {
   CREATE: 'CREATE',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
 } as const;
 
 export type ProjectsIntent =

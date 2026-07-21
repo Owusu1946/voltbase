@@ -31,6 +31,8 @@ export const TABLE_EDITOR_INTENT = {
   DELETE_TABLE: 'DELETE_TABLE',
   FETCH_TABLE: 'FETCH_TABLE',
   ADD_COLUMN: 'ADD_COLUMN',
+  INSERT_ROW: 'INSERT_ROW',
+  DELETE_ROW: 'DELETE_ROW',
 } as const;
 
 export type TableEditorIntent =

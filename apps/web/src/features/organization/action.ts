@@ -10,6 +10,7 @@ import { organizationServerSchema } from './server.schema';
 
 export type OrganizationActionState = {
   error?: string;
+  success?: string;
 };
 
 export async function organizationAction(
@@ -24,22 +25,39 @@ export async function organizationAction(
   }
 
   const token = await retrieveTokenFromCookie();
-
-  let slug: string;
+  const headers = { Cookie: `${COOKIE_KEYS.ACCESS_TOKEN}=${token}` };
+  const { intent } = parsed.data;
 
   try {
-    const { data } = await apiClient.post<{ slug: string }>(
-      '/orgs',
-      { name: parsed.data.name },
-      { headers: { Cookie: `${COOKIE_KEYS.ACCESS_TOKEN}=${token}` } },
-    );
-
-    slug = data.slug;
+    switch (intent) {
+      case ORGANIZATION_INTENT.CREATE: {
+        const { data } = await apiClient.post<{ slug: string }>(
+          '/orgs',
+          { name: parsed.data.name },
+          { headers },
+        );
+        revalidatePath('/organizations');
+        redirect(`/organizations/${data.slug}/projects`);
+      }
+      case ORGANIZATION_INTENT.UPDATE: {
+        const slug = String(formData.get('slug') ?? '');
+        if (!slug) return { error: 'Missing organization' };
+        await apiClient.patch(`/orgs/${slug}`, { name: parsed.data.name }, { headers });
+        revalidatePath(`/organizations/${slug}`);
+        revalidatePath('/organizations');
+        return { success: 'Organization renamed' };
+      }
+      case ORGANIZATION_INTENT.DELETE: {
+        const slug = String(formData.get('slug') ?? '');
+        if (!slug) return { error: 'Missing organization' };
+        await apiClient.delete(`/orgs/${slug}`, { headers });
+        revalidatePath('/organizations');
+        redirect('/organizations');
+      }
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
+    if (err?.digest?.startsWith?.('NEXT_REDIRECT')) throw err;
     return { error: err.response?.data?.message ?? 'Something went wrong' };
   }
-
-  revalidatePath('/organizations');
-  redirect(`/organizations/${slug}/projects`);
 }

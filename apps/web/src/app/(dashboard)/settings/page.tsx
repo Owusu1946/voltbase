@@ -8,5 +8,5 @@ export default async function SettingsPage() {
     redirect('/organizations/new');
   }
 
-  redirect(`/organizations/${orgs[0].slug}/settings/members`);
+  redirect(`/organizations/${orgs[0].slug}/settings`);
 }

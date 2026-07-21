@@ -4,6 +4,8 @@ import {
   createTableSchema,
   deleteTableSchema,
   fetchTableSchema,
+  insertRowSchema,
+  deleteRowSchema,
 } from './client.schema';
 import { TABLE_EDITOR_INTENT } from '@voltbase/constants';
 
@@ -37,5 +39,26 @@ export const tableEditorServerSchema = z.discriminatedUnion('intent', [
   z.object({
     intent: z.literal(TABLE_EDITOR_INTENT.ADD_COLUMN),
     ...addColumnSchema.shape,
+  }),
+  z.object({
+    intent: z.literal(TABLE_EDITOR_INTENT.INSERT_ROW),
+    tableName: insertRowSchema.shape.tableName,
+    values: z.string().transform((raw, ctx) => {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          ctx.addIssue({ code: 'custom', message: 'Invalid row values' });
+          return z.NEVER;
+        }
+        return parsed as Record<string, unknown>;
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'Invalid row JSON' });
+        return z.NEVER;
+      }
+    }),
+  }),
+  z.object({
+    intent: z.literal(TABLE_EDITOR_INTENT.DELETE_ROW),
+    ...deleteRowSchema.shape,
   }),
 ]);
