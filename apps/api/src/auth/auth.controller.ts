@@ -84,10 +84,12 @@ export class AuthController {
   @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Res() res: Response) {
     const tokens = await this.authService.handleGoogleCallback(code);
-    this.authService.setTokenCookies(res, tokens);
-    return res.redirect(
-      `${this.configService.get<string>('WEB_URL')}/dashboard`,
-    );
+    const webUrl = this.configService.get<string>('WEB_URL');
+    const params = new URLSearchParams({
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+    });
+    return res.redirect(`${webUrl}/auth/oauth/callback?${params.toString()}`);
   }
 
   @Get('github')
@@ -99,10 +101,12 @@ export class AuthController {
   @Get('github/callback')
   async githubCallback(@Query('code') code: string, @Res() res: Response) {
     const tokens = await this.authService.handleGithubCallback(code);
-    this.authService.setTokenCookies(res, tokens);
-    return res.redirect(
-      `${this.configService.get<string>('WEB_URL')}/dashboard`,
-    );
+    const webUrl = this.configService.get<string>('WEB_URL');
+    const params = new URLSearchParams({
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+    });
+    return res.redirect(`${webUrl}/auth/oauth/callback?${params.toString()}`);
   }
 
   @Get('invite/accept')
