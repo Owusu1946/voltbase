@@ -1,0 +1,26 @@
+---
+description: >-
+  Edge Functions / Cloudflare Workers for Platforms plan for Voltbase.
+  Apply when the user mentions edge, edge functions, Workers for Platforms,
+  functions.invoke, or asks to resume/build Edge Functions.
+alwaysApply: false
+---
+
+# Edge Functions (deferred)
+
+## When this applies
+
+User mentions **edge**, **edge functions**, **Workers for Platforms**, `functions.invoke`, or **resume edge**.
+
+## What to do
+
+1. Read the canonical plan: [`docs/plans/edge-functions-cloudflare.md`](docs/plans/edge-functions-cloudflare.md)
+2. Status is **deferred** until Cloudflare **Workers for Platforms** (~$25/mo) is funded — do **not** start building unless the user explicitly asks to implement/resume.
+3. When they say build/resume/execute: follow that plan Phase 1 (dispatch Worker + Nest control plane + dashboard + SDK). Do **not** run invoke through Railway.
+
+## Locked decisions (do not re-litigate)
+
+- Compute: Cloudflare Workers for Platforms (not Deno-on-Railway, not free Workers alone)
+- Invoke: global CF dispatch Worker; Nest = deploy/secrets only
+- Runtime: Workers `fetch` handlers, not `Deno.serve`
+- Auth: same project JWT as REST (`anon` / `service_role`)

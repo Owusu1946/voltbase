@@ -1,0 +1,25 @@
+---
+description: >-
+  Voltbase Hosting (Cloudflare Pages) — Vercel-style Git deploy.
+  Apply when the user mentions hosting, deploy site, import repo, Pages, or Vercel-style deploy.
+alwaysApply: false
+---
+
+# Hosting (Cloudflare Pages)
+
+## When this applies
+
+User mentions **hosting**, **deploy**, **import repo**, **Cloudflare Pages**, or **Vercel-style** frontend deploy.
+
+## What to do
+
+1. Read [`docs/plans/voltbase-hosting-pages.md`](docs/plans/voltbase-hosting-pages.md)
+2. Code lives in `apps/api/src/hosting/` and `apps/web/src/features/hosting/`
+3. Requires `CF_ACCOUNT_ID` + `CF_API_TOKEN`; GitHub OAuth for repo list
+4. Free Pages soft-cap ~95 projects; Next SSR needs Workers/OpenNext (phase 2)
+
+## Locked decisions
+
+- Nest builds + Cloudflare Pages Direct Upload (multi-tenant on Free)
+- Auto-inject Voltbase URL + anon key
+- Vercel-style Import → Build theater → Ready UX

@@ -64,6 +64,11 @@ export const FrameworksOverviewPage: DocEntry = {
         ))}
       </ul>
       <p>
+        Ready to ship? Use dashboard{' '}
+        <Link href="/docs/hosting">Hosting</Link> to import the repo and deploy
+        to Cloudflare Pages with Voltbase env injected.
+      </p>
+      <p>
         Looking for a framework-agnostic path? Start with the{' '}
         <Link href="/docs/getting-started/quickstart">Quickstart</Link> or{' '}
         <Link href="/docs/javascript/install">JavaScript install</Link>.

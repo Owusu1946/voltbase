@@ -17,6 +17,7 @@ import {
   TerminalIcon,
   GitBranch,
   Puzzle,
+  Rocket,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -52,6 +53,7 @@ const projectNavItems = [
   { icon: GitBranch, label: 'Migrations', segment: 'migrations' },
   { icon: ShieldCheck, label: 'Auth', segment: 'auth' },
   { icon: FolderOpen, label: 'Storage', segment: 'storage' },
+  { icon: Rocket, label: 'Hosting', segment: 'hosting' },
   { icon: Code2, label: 'API', segment: 'api' },
   { icon: Radio, label: 'Realtime', segment: 'realtime' },
 ] as const;

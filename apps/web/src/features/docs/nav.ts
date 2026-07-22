@@ -88,6 +88,7 @@ export const DOCS_NAV: DocsNavGroup[] = [
       { title: 'Row Level Security', href: '/docs/database/rls' },
       { title: 'Keys & roles', href: '/docs/database/keys' },
       { title: 'Vectors (pgvector)', href: '/docs/database/vectors' },
+      { title: 'Hosting', href: '/docs/hosting' },
     ],
   },
   {

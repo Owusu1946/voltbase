@@ -40,6 +40,10 @@ export const DashboardTourPage: DocEntry = {
             <td>Buckets and files</td>
           </tr>
           <tr>
+            <td>Hosting</td>
+            <td>Import GitHub → deploy to Cloudflare Pages (Vercel-style)</td>
+          </tr>
+          <tr>
             <td>API</td>
             <td>Project URL, anon/service keys, rotate, table curl examples</td>
           </tr>

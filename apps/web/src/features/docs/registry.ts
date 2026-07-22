@@ -24,6 +24,7 @@ import { TablesMigrationsPage } from './content/tables-migrations';
 import { RlsPage } from './content/rls';
 import { KeysPage } from './content/keys';
 import { VectorsPage } from './content/vectors';
+import { HostingPage } from './content/hosting';
 import { DashboardTourPage } from './content/dashboard-tour';
 import { TodoRlsPage } from './content/todo-rls';
 import { LiveChatPage } from './content/live-chat';
@@ -64,6 +65,7 @@ export const DOC_REGISTRY: Record<string, DocEntry> = {
   'database/rls': RlsPage,
   'database/keys': KeysPage,
   'database/vectors': VectorsPage,
+  hosting: HostingPage,
   'dashboard/tour': DashboardTourPage,
   'examples/todo-rls': TodoRlsPage,
   'examples/live-chat': LiveChatPage,
