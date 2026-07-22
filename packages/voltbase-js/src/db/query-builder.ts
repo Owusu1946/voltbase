@@ -11,11 +11,14 @@ export interface QueryResult<T> {
   error: string | null;
 }
 
+export type GetUserToken = () => string | null;
+
 export class QueryBuilder<T = Record<string, unknown>> {
   private _method: HttpMethod = 'GET';
   private _body: Record<string, unknown> | null = null;
   private _filters: FilterClause[] = [];
-  private _selectColumns: string[] = [];
+  /** Raw select string (supports embeds); null means default `*`. */
+  private _select: string | null = null;
   private _orderCol: string | null = null;
   private _orderDir: 'asc' | 'desc' = 'asc';
   private _limitVal: number | null = null;
@@ -25,11 +28,12 @@ export class QueryBuilder<T = Record<string, unknown>> {
     private projectUrl: string,
     private table: string,
     private apiKey: string,
+    private getUserToken?: GetUserToken,
   ) {}
 
   select(columns = '*'): this {
-    this._selectColumns =
-      columns === '*' ? [] : columns.split(',').map((c) => c.trim());
+    // Keep the string intact so nested embeds like `author:users(id,name)` work.
+    this._select = columns === '*' ? null : columns;
     return this;
   }
 
@@ -127,6 +131,16 @@ export class QueryBuilder<T = Record<string, unknown>> {
     return idFilter.value;
   }
 
+  private buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
+    const token = this.getUserToken?.();
+    if (token) headers['X-User-Jwt'] = token;
+    return headers;
+  }
+
   private buildUrl(): string {
     const base = `${this.projectUrl}/rest/${this.table}`;
 
@@ -136,8 +150,8 @@ export class QueryBuilder<T = Record<string, unknown>> {
 
     const params = new URLSearchParams();
 
-    if (this._selectColumns.length > 0) {
-      params.set('select', this._selectColumns.join(','));
+    if (this._select) {
+      params.set('select', this._select);
     }
 
     for (const { column, operator, value } of this._filters) {
@@ -159,10 +173,7 @@ export class QueryBuilder<T = Record<string, unknown>> {
     try {
       const res = await fetch(this.buildUrl(), {
         method: this._method,
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: this.buildHeaders(),
         body: this._body ? JSON.stringify(this._body) : undefined,
       });
 

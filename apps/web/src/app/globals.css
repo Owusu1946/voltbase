@@ -115,3 +115,30 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+/* Docs code blocks — sugar-high token colors (fallback if inline vars miss) */
+.docs-code .sh__token--keyword {
+  color: #f47067 !important;
+}
+.docs-code .sh__token--string {
+  color: #00a99a !important;
+}
+.docs-code .sh__token--class {
+  color: #6a9ad2 !important;
+}
+.docs-code .sh__token--comment {
+  color: #a19595 !important;
+}
+.docs-code .sh__token--sign {
+  color: #8996a3 !important;
+}
+.docs-code .sh__token--identifier,
+.docs-code .sh__token--property {
+  color: #354150 !important;
+}
+.docs-code .sh__token--entity {
+  color: #249a97 !important;
+}
+.docs-code .sh__token--jsxliterals {
+  color: #6266d1 !important;
+}

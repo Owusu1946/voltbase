@@ -3,9 +3,10 @@ import { AuthModule } from '../auth/auth.module';
 import { OrgRoleGuard } from '../auth/guards/org-role.guard';
 import { TableEditorService } from './table-editor.service';
 import { TableEditorController } from './table-editor.controller';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, ProjectsModule],
   providers: [TableEditorService, OrgRoleGuard],
   controllers: [TableEditorController],
 })

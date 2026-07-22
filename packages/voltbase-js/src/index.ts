@@ -10,8 +10,15 @@ export function createClient(
 export { VoltbaseClient } from './client';
 export { QueryBuilder, VoltbaseDb } from './db';
 export type { QueryResult } from './db';
-export { VoltbaseRealtime } from './realtime';
-export type { RealtimeCallback } from './realtime';
+export { VoltbaseRealtime, RealtimeChannel } from './realtime';
+export type {
+  RealtimeCallback,
+  RealtimeSubscribeOptions,
+  BroadcastCallback,
+  PresenceCallback,
+  PresenceSyncPayload,
+  PresenceJoinLeavePayload,
+} from './realtime';
 export { VoltbaseStorage } from './storage';
 export { VoltbaseAuth } from './auth';
 export type {

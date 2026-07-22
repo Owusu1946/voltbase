@@ -10,6 +10,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { TableEditorModule } from './table-editor/table-editor.module';
 import { ProjectApiModule } from './project-api/project-api.module';
 import { SqlEditorModule } from './sql-editor/sql-editor.module';
+import { MigrationsModule } from './migrations/migrations.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StorageModule } from './storage/storage.module';
 import { ProjectAuthModule } from './project-auth/project-auth.module';
@@ -27,6 +28,7 @@ import { ProjectAuthModule } from './project-auth/project-auth.module';
     TableEditorModule,
     ProjectApiModule,
     SqlEditorModule,
+    MigrationsModule,
     RealtimeModule,
     StorageModule,
     ProjectAuthModule,

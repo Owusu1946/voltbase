@@ -12,6 +12,13 @@ import {
 import { TableEditorService } from './table-editor.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { AddColumnDto } from './dto/alter-table.dto';
+import {
+  CreateIndexDto,
+  CreateUniqueConstraintDto,
+  CreateForeignKeyDto,
+  CreatePolicyDto,
+  SetRlsDto,
+} from './dto/constraints.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrgRoleGuard } from '../auth/guards/org-role.guard';
 
@@ -85,6 +92,130 @@ export class TableEditorController {
       projectSlug,
       tableName,
       columnName,
+    );
+  }
+
+  @Post(':tableName/indexes')
+  createIndex(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Body() dto: CreateIndexDto,
+  ) {
+    return this.tableEditorService.createIndex(
+      slug,
+      projectSlug,
+      tableName,
+      dto,
+    );
+  }
+
+  @Delete(':tableName/indexes/:indexName')
+  dropIndex(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('indexName') indexName: string,
+  ) {
+    return this.tableEditorService.dropIndex(slug, projectSlug, indexName);
+  }
+
+  @Post(':tableName/constraints/unique')
+  createUnique(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Body() dto: CreateUniqueConstraintDto,
+  ) {
+    return this.tableEditorService.createUniqueConstraint(
+      slug,
+      projectSlug,
+      tableName,
+      dto,
+    );
+  }
+
+  @Delete(':tableName/constraints/:constraintName')
+  dropConstraint(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Param('constraintName') constraintName: string,
+  ) {
+    return this.tableEditorService.dropConstraint(
+      slug,
+      projectSlug,
+      tableName,
+      constraintName,
+    );
+  }
+
+  @Post(':tableName/foreign-keys')
+  createForeignKey(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Body() dto: CreateForeignKeyDto,
+  ) {
+    return this.tableEditorService.createForeignKey(
+      slug,
+      projectSlug,
+      tableName,
+      dto,
+    );
+  }
+
+  @Delete(':tableName/foreign-keys/:constraintName')
+  dropForeignKey(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Param('constraintName') constraintName: string,
+  ) {
+    return this.tableEditorService.dropConstraint(
+      slug,
+      projectSlug,
+      tableName,
+      constraintName,
+    );
+  }
+
+  @Post(':tableName/rls')
+  setRls(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Body() dto: SetRlsDto,
+  ) {
+    return this.tableEditorService.setRls(slug, projectSlug, tableName, dto);
+  }
+
+  @Post(':tableName/policies')
+  createPolicy(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Body() dto: CreatePolicyDto,
+  ) {
+    return this.tableEditorService.createPolicy(
+      slug,
+      projectSlug,
+      tableName,
+      dto,
+    );
+  }
+
+  @Delete(':tableName/policies/:policyName')
+  dropPolicy(
+    @Param('slug') slug: string,
+    @Param('projectSlug') projectSlug: string,
+    @Param('tableName') tableName: string,
+    @Param('policyName') policyName: string,
+  ) {
+    return this.tableEditorService.dropPolicy(
+      slug,
+      projectSlug,
+      tableName,
+      policyName,
     );
   }
 

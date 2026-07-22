@@ -65,6 +65,14 @@ export const REALTIME_EVENTS = {
   UNSUBSCRIBE: 'unsubscribe',
   EVENT: 'event',
   ERROR: 'error',
+  CHANNEL_SUBSCRIBE: 'channel:subscribe',
+  CHANNEL_UNSUBSCRIBE: 'channel:unsubscribe',
+  PRESENCE_TRACK: 'presence:track',
+  PRESENCE_UNTRACK: 'presence:untrack',
+  PRESENCE_SYNC: 'presence:sync',
+  PRESENCE_JOIN: 'presence:join',
+  PRESENCE_LEAVE: 'presence:leave',
+  BROADCAST: 'broadcast',
 } as const;
 
 // ─── Project Auth ─────────────────────────────────────────────────────────────
@@ -75,4 +83,11 @@ export const AUTH_PROVIDERS = {
   GITHUB: 'github',
 } as const;
 
+export const AUTH_TOKEN_TYPES = {
+  EMAIL_VERIFY: 'email_verify',
+  PASSWORD_RESET: 'password_reset',
+} as const;
+
 export const MAGIC_LINK_EXPIRES_IN = '15m';
+export const EMAIL_VERIFY_EXPIRES_MS = 24 * 60 * 60 * 1000; // 24h
+export const PASSWORD_RESET_EXPIRES_MS = 60 * 60 * 1000; // 1h

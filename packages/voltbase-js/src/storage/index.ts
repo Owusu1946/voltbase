@@ -1,5 +1,5 @@
 import { genUploader } from 'uploadthing/client';
-import type { StorageObject } from '@voltbase/types';
+import type { StorageBucket, StorageObject } from '@voltbase/types';
 
 type StorageUploadRouter = {
   bucketUploader: {
@@ -124,7 +124,38 @@ export class VoltbaseStorage {
   from(bucketName: string): StorageBucketRef {
     return new StorageBucketRef(this.projectUrl, this.apiKey, bucketName);
   }
-}
 
-// const bucket = supabavolt.storage.from('test');
-// const {data: files} = await bucket.list();
+  async listBuckets(): Promise<StorageResult<StorageBucket[]>> {
+    return apiFetch<StorageBucket[]>(
+      `${this.projectUrl}/storage/buckets`,
+      this.apiKey,
+    );
+  }
+
+  async createBucket(
+    name: string,
+    opts?: { public?: boolean },
+  ): Promise<StorageResult<StorageBucket>> {
+    return apiFetch<StorageBucket>(
+      `${this.projectUrl}/storage/buckets`,
+      this.apiKey,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          access: opts?.public ? 'public' : 'private',
+        }),
+      },
+    );
+  }
+
+  async deleteBucket(
+    name: string,
+  ): Promise<StorageResult<{ message: string }>> {
+    return apiFetch<{ message: string }>(
+      `${this.projectUrl}/storage/buckets/${encodeURIComponent(name)}`,
+      this.apiKey,
+      { method: 'DELETE' },
+    );
+  }
+}

@@ -53,6 +53,7 @@ import { TABLE_EDITOR_INTENT } from '@voltbase/constants';
 import { CreateTableDrawer } from './create-table-drawer';
 import { AddColumnDialog } from './add-column-dialog';
 import { InsertRowDialog } from './insert-row-dialog';
+import { SchemaConstraintsPanel } from './schema-constraints-panel';
 
 interface TableEditorClientProps {
   orgSlug: string;
@@ -255,6 +256,7 @@ export function TableEditorClient({
     <EditorMainPanel
       orgSlug={orgSlug}
       projectSlug={projectSlug}
+      tables={tables}
       openTabs={openTabs}
       activeTab={activeTab}
       currentTab={currentTab}
@@ -270,6 +272,7 @@ export function TableEditorClient({
     <EditorMainPanel
       orgSlug={orgSlug}
       projectSlug={projectSlug}
+      tables={tables}
       openTabs={openTabs}
       activeTab={activeTab}
       currentTab={currentTab}
@@ -526,6 +529,7 @@ function TableListPanel({
 function EditorMainPanel({
   orgSlug,
   projectSlug,
+  tables,
   openTabs,
   activeTab,
   currentTab,
@@ -538,6 +542,7 @@ function EditorMainPanel({
 }: {
   orgSlug: string;
   projectSlug: string;
+  tables: string[];
   openTabs: OpenTab[];
   activeTab: string | null;
   currentTab: OpenTab | undefined;
@@ -622,6 +627,7 @@ function EditorMainPanel({
           projectSlug={projectSlug}
           tableName={currentTab.tableName}
           tableInfo={currentTab.info}
+          tables={tables}
           rows={currentTab.rows}
           count={currentTab.count}
           onExpandRow={onExpandRow}
@@ -637,6 +643,7 @@ function DataGrid({
   projectSlug,
   tableName,
   tableInfo,
+  tables,
   rows,
   count,
   onExpandRow,
@@ -646,6 +653,7 @@ function DataGrid({
   projectSlug: string;
   tableName: string;
   tableInfo: TableInfo;
+  tables: string[];
   rows: Record<string, unknown>[];
   count: number;
   onExpandRow: (row: Record<string, unknown>) => void;
@@ -776,6 +784,14 @@ function DataGrid({
           </TableBody>
         </Table>
       </ScrollArea>
+
+      <SchemaConstraintsPanel
+        orgSlug={orgSlug}
+        projectSlug={projectSlug}
+        tableInfo={tableInfo}
+        tables={tables}
+        onChanged={onColumnAdded}
+      />
 
       <div className="flex items-center justify-between px-4 py-2 border-t border-border text-xs text-muted-foreground shrink-0">
         <span>

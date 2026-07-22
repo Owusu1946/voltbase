@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Radio, Trash2, Table2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { REALTIME_EVENTS } from '@voltbase/constants';
-import type { RealtimeEvent } from '@voltbase/types';
+import type { RealtimeEvent, RealtimeSubscribePayload } from '@voltbase/types';
 import {
   disableRealtimeTableAction,
   enableRealtimeTableAction,
@@ -36,6 +37,21 @@ function getRealtimeSocketBaseUrl(): string {
   return apiUrl.replace(/\/api\/?$/, '');
 }
 
+/** Parse `col=value,col2=value2` into an eq-only filter map. */
+function parseFilterInput(raw: string): Record<string, string> | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const filter: Record<string, string> = {};
+  for (const part of trimmed.split(',')) {
+    const eq = part.indexOf('=');
+    if (eq <= 0) continue;
+    const key = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (key) filter[key] = value;
+  }
+  return Object.keys(filter).length > 0 ? filter : undefined;
+}
+
 export function RealtimeClient({
   orgSlug,
   projectSlug,
@@ -47,13 +63,19 @@ export function RealtimeClient({
   const [subscribedTables, setSubscribedTables] = useState<Set<string>>(
     new Set(),
   );
+  const [filterInputs, setFilterInputs] = useState<Record<string, string>>({});
   const [events, setEvents] = useState<(RealtimeEvent & { id: string })[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const subscribedRef = useRef<Set<string>>(new Set());
+  const filterInputsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     subscribedRef.current = subscribedTables;
   }, [subscribedTables]);
+
+  useEffect(() => {
+    filterInputsRef.current = filterInputs;
+  }, [filterInputs]);
 
   useEffect(() => {
     const socket = io(`${getRealtimeSocketBaseUrl()}/realtime`, {
@@ -65,7 +87,13 @@ export function RealtimeClient({
       setConnected(true);
       // re-subscribe after reconnect
       for (const tableName of subscribedRef.current) {
-        socket.emit(REALTIME_EVENTS.SUBSCRIBE, tableName);
+        const filter = parseFilterInput(
+          filterInputsRef.current[tableName] ?? '',
+        );
+        const payload: string | RealtimeSubscribePayload = filter
+          ? { table: tableName, filter }
+          : tableName;
+        socket.emit(REALTIME_EVENTS.SUBSCRIBE, payload);
       }
     });
 
@@ -103,7 +131,11 @@ export function RealtimeClient({
         );
         if (!result.ok) return;
 
-        socket.emit(REALTIME_EVENTS.SUBSCRIBE, tableName);
+        const filter = parseFilterInput(filterInputsRef.current[tableName] ?? '');
+        const payload: string | RealtimeSubscribePayload = filter
+          ? { table: tableName, filter }
+          : tableName;
+        socket.emit(REALTIME_EVENTS.SUBSCRIBE, payload);
         setSubscribedTables((prev) => new Set([...prev, tableName]));
       } else {
         socket.emit(REALTIME_EVENTS.UNSUBSCRIBE, tableName);
@@ -163,32 +195,46 @@ export function RealtimeClient({
               {tables.map((table) => (
                 <div
                   key={table}
-                  className="flex items-center justify-between rounded-xl border border-border p-3"
+                  className="space-y-2 rounded-xl border border-border p-3"
                 >
-                  <div className="flex items-center gap-2">
-                    <Table2 size={14} className="text-muted-foreground" />
-                    <span className="font-mono text-sm">{table}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Table2 size={14} className="text-muted-foreground" />
+                      <span className="font-mono text-sm">{table}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          'text-xs font-medium',
+                          subscribedTables.has(table)
+                            ? 'text-green-600'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        {subscribedTables.has(table) ? 'Listening' : 'Off'}
+                      </span>
+                      <Switch
+                        checked={subscribedTables.has(table)}
+                        onCheckedChange={(checked) =>
+                          void toggleTable(table, checked)
+                        }
+                        disabled={!connected}
+                        className="h-6 w-11 shrink-0 border border-border shadow-sm data-[state=checked]:bg-primary data-[state=unchecked]:bg-neutral-300 data-[state=unchecked]:dark:bg-neutral-600 [&_[data-slot=switch-thumb]]:size-5 [&_[data-slot=switch-thumb]]:bg-white [&_[data-slot=switch-thumb]]:shadow"
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        'text-xs font-medium',
-                        subscribedTables.has(table)
-                          ? 'text-green-600'
-                          : 'text-muted-foreground',
-                      )}
-                    >
-                      {subscribedTables.has(table) ? 'Listening' : 'Off'}
-                    </span>
-                    <Switch
-                      checked={subscribedTables.has(table)}
-                      onCheckedChange={(checked) =>
-                        void toggleTable(table, checked)
-                      }
-                      disabled={!connected}
-                      className="h-6 w-11 shrink-0 border border-border shadow-sm data-[state=checked]:bg-primary data-[state=unchecked]:bg-neutral-300 data-[state=unchecked]:dark:bg-neutral-600 [&_[data-slot=switch-thumb]]:size-5 [&_[data-slot=switch-thumb]]:bg-white [&_[data-slot=switch-thumb]]:shadow"
-                    />
-                  </div>
+                  <Input
+                    placeholder="Filter eq: status=active"
+                    value={filterInputs[table] ?? ''}
+                    onChange={(e) =>
+                      setFilterInputs((prev) => ({
+                        ...prev,
+                        [table]: e.target.value,
+                      }))
+                    }
+                    disabled={subscribedTables.has(table)}
+                    className="h-8 font-mono text-xs"
+                  />
                 </div>
               ))}
             </div>

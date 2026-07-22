@@ -35,12 +35,34 @@ export class StorageService {
     return row;
   }
 
-  async getBuckets(orgSlug: string, projectSlug: string) {
-    const project = await this.getProject(orgSlug, projectSlug);
+  async getBucketsForProject(projectId: string) {
     return this.drizzle.db
       .select()
       .from(storageBuckets)
-      .where(eq(storageBuckets.projectId, project.id));
+      .where(eq(storageBuckets.projectId, projectId));
+  }
+
+  async getBuckets(orgSlug: string, projectSlug: string) {
+    const project = await this.getProject(orgSlug, projectSlug);
+    return this.getBucketsForProject(project.id);
+  }
+
+  async createBucketForProject(
+    projectId: string,
+    name: string,
+    access: BucketAccess,
+  ) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new BadRequestException('Bucket name is required');
+    }
+
+    const [bucket] = await this.drizzle.db
+      .insert(storageBuckets)
+      .values({ projectId, name: trimmed, access })
+      .returning();
+
+    return bucket;
   }
 
   async createBucket(
@@ -50,18 +72,7 @@ export class StorageService {
     access: BucketAccess,
   ) {
     const project = await this.getProject(orgSlug, projectSlug);
-
-    const trimmed = name.trim();
-    if (!trimmed) {
-      throw new BadRequestException('Bucket name is required');
-    }
-
-    const [bucket] = await this.drizzle.db
-      .insert(storageBuckets)
-      .values({ projectId: project.id, name: trimmed, access })
-      .returning();
-
-    return bucket;
+    return this.createBucketForProject(project.id, name, access);
   }
 
   async deleteBucket(bucketId: string) {

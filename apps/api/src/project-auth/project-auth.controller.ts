@@ -5,6 +5,9 @@ import { ProjectAuthService } from './project-auth.service';
 import { SignUpDto } from './dto/signup.dto';
 import { SignInDto } from './dto/signin.dto';
 import { MagicLinkDto } from './dto/magic-link.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('projects/:projectSlug/auth')
 export class ProjectAuthController {
@@ -23,6 +26,47 @@ export class ProjectAuthController {
     return this.projectAuthService.signIn(projectSlug, dto);
   }
 
+  @Get('verify-email')
+  async verifyEmail(
+    @Param('projectSlug') projectSlug: string,
+    @Query('token') token: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.projectAuthService.verifyEmail(
+      projectSlug,
+      token,
+    );
+    return res.redirect(`${result.siteUrl}/?type=signup`);
+  }
+
+  @Post('resend-verification')
+  resendVerification(
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: ResendVerificationDto,
+  ) {
+    return this.projectAuthService.resendVerification(projectSlug, dto.email);
+  }
+
+  @Post('forgot-password')
+  forgotPassword(
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: ForgotPasswordDto,
+  ) {
+    return this.projectAuthService.forgotPassword(projectSlug, dto.email);
+  }
+
+  @Post('reset-password')
+  resetPassword(
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: ResetPasswordDto,
+  ) {
+    return this.projectAuthService.resetPassword(
+      projectSlug,
+      dto.token,
+      dto.password,
+    );
+  }
+
   @Post('magic-link')
   sendMagicLink(
     @Param('projectSlug') projectSlug: string,
@@ -32,11 +76,18 @@ export class ProjectAuthController {
   }
 
   @Get('magic-link/verify')
-  verifyMagicLink(
+  async verifyMagicLink(
     @Param('projectSlug') projectSlug: string,
     @Query('token') token: string,
+    @Res() res: Response,
   ) {
-    return this.projectAuthService.verifyMagicLink(projectSlug, token);
+    const result = await this.projectAuthService.verifyMagicLink(
+      projectSlug,
+      token,
+    );
+    const webUrl =
+      await this.projectAuthService.getSiteUrlForProject(projectSlug);
+    return res.redirect(`${webUrl}/?access_token=${result.accessToken}`);
   }
 
   @Get('google')

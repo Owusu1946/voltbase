@@ -57,13 +57,18 @@ export default function Home() {
               <span className="cursor-default hover:text-[#1c1c1c]">
                 Product
               </span>
-              <span className="cursor-default hover:text-[#1c1c1c]">
+              <Link
+                href="/docs/getting-started/quickstart"
+                className="hover:text-[#1c1c1c]"
+              >
                 Developers
-              </span>
+              </Link>
               <span className="cursor-default hover:text-[#1c1c1c]">
                 Pricing
               </span>
-              <span className="cursor-default hover:text-[#1c1c1c]">Docs</span>
+              <Link href="/docs" className="hover:text-[#1c1c1c]">
+                Docs
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">

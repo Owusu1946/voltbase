@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Next,
   Param,
@@ -12,8 +13,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { IsNumber, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsString } from 'class-validator';
 import { PROJECT_KEY_ROLES } from '@voltbase/constants';
+import type { BucketAccess } from '@voltbase/types';
 import { createRouteHandler } from 'uploadthing/express';
 import { StorageService } from './storage.service';
 import { storageRouter } from './uploadthing';
@@ -21,7 +23,14 @@ import {
   ProjectKeyGuard,
   type ProjectKeyPayload,
 } from '../project-api/project-key.guard';
-import { ForbiddenException } from '@nestjs/common';
+
+class CreateBucketDto {
+  @IsString()
+  name!: string;
+
+  @IsEnum(['public', 'private'])
+  access!: BucketAccess;
+}
 
 class SaveObjectDto {
   @IsString()
@@ -58,6 +67,48 @@ export class ProjectStorageController {
         'Write operations require the service role key',
       );
     }
+  }
+
+  @Get('buckets')
+  async listBuckets(
+    @Req() req: Request,
+    @Param('projectSlug') projectSlug: string,
+  ) {
+    const { projectId } = this.getProjectKey(req);
+    await this.storageService.assertProjectSlug(projectId, projectSlug);
+    return this.storageService.getBucketsForProject(projectId);
+  }
+
+  @Post('buckets')
+  async createBucket(
+    @Req() req: Request,
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: CreateBucketDto,
+  ) {
+    this.assertWriteAccess(req);
+    const { projectId } = this.getProjectKey(req);
+    await this.storageService.assertProjectSlug(projectId, projectSlug);
+    return this.storageService.createBucketForProject(
+      projectId,
+      dto.name,
+      dto.access,
+    );
+  }
+
+  @Delete('buckets/:bucketName')
+  async deleteBucket(
+    @Req() req: Request,
+    @Param('projectSlug') projectSlug: string,
+    @Param('bucketName') bucketName: string,
+  ) {
+    this.assertWriteAccess(req);
+    const { projectId } = this.getProjectKey(req);
+    await this.storageService.assertProjectSlug(projectId, projectSlug);
+    const bucket = await this.storageService.getBucketByName(
+      projectId,
+      bucketName,
+    );
+    return this.storageService.deleteBucket(bucket.id);
   }
 
   @Get('buckets/:bucketName/objects')

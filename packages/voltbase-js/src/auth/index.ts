@@ -185,6 +185,64 @@ export class VoltbaseAuth {
     }
   }
 
+  async resendVerification(email: string): Promise<{ error: string | null }> {
+    try {
+      const res = await fetch(`${this.projectUrl}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) return { error: 'Failed to resend verification email' };
+      return { error: null };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Network error';
+      return { error: message };
+    }
+  }
+
+  async resetPasswordForEmail(
+    email: string,
+  ): Promise<{ error: string | null }> {
+    try {
+      const res = await fetch(`${this.projectUrl}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) return { error: 'Failed to send password reset email' };
+      return { error: null };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Network error';
+      return { error: message };
+    }
+  }
+
+  async updatePassword(credentials: {
+    token: string;
+    password: string;
+  }): Promise<{ error: string | null }> {
+    try {
+      const res = await fetch(`${this.projectUrl}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        return { error: err.message ?? 'Failed to update password' };
+      }
+      return { error: null };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Network error';
+      return { error: message };
+    }
+  }
+
   signInWithGoogle(): void {
     window.location.href = `${this.projectUrl}/auth/google`;
   }

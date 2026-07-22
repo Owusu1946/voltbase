@@ -33,6 +33,10 @@ export class CreateColumnDto implements CreateColumnInput {
   @IsOptional()
   defaultValue?: string;
 
+  @IsBoolean()
+  @IsOptional()
+  unique?: boolean;
+
   @IsString()
   @IsOptional()
   foreignKeyTable?: string;

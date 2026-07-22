@@ -8,11 +8,30 @@ import { DrizzleService } from '../db/drizzle.service';
 import { projects, organizations } from '../db/schema';
 import { CreateTableDto } from './dto/create-table.dto';
 import { AddColumnDto } from './dto/alter-table.dto';
-import type { TableInfo, TableColumn, ColumnType } from '@voltbase/types';
+import type {
+  TableInfo,
+  TableColumn,
+  ColumnType,
+  TableIndex,
+  TableUniqueConstraint,
+  TableForeignKey,
+  TablePolicy,
+} from '@voltbase/types';
+import {
+  CreateIndexDto,
+  CreateUniqueConstraintDto,
+  CreateForeignKeyDto,
+  CreatePolicyDto,
+  SetRlsDto,
+} from './dto/constraints.dto';
+import { ProjectsService } from '../projects/projects.service';
 
 @Injectable()
 export class TableEditorService {
-  constructor(private drizzle: DrizzleService) {}
+  constructor(
+    private drizzle: DrizzleService,
+    private projectsService: ProjectsService,
+  ) {}
 
   private assertSafeIdentifier(name: string, label: string): void {
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
@@ -134,31 +153,150 @@ export class TableEditorService {
     const pkColumns = new Set(pkResult.rows.map((r) => r.column_name));
 
     const fkResult = await this.drizzle.db.execute<{
+      constraint_name: string;
       column_name: string;
       foreign_table_name: string;
       foreign_column_name: string;
+      delete_rule: string;
+      update_rule: string;
+      ordinal_position: number;
     }>(
       `SELECT
+         tc.constraint_name,
          kcu.column_name,
          ccu.table_name AS foreign_table_name,
-         ccu.column_name AS foreign_column_name
+         ccu.column_name AS foreign_column_name,
+         rc.delete_rule,
+         rc.update_rule,
+         kcu.ordinal_position
        FROM information_schema.table_constraints tc
        JOIN information_schema.key_column_usage kcu
          ON tc.constraint_name = kcu.constraint_name
          AND tc.table_schema = kcu.table_schema
        JOIN information_schema.constraint_column_usage ccu
          ON ccu.constraint_name = tc.constraint_name
+         AND ccu.constraint_schema = tc.table_schema
+       JOIN information_schema.referential_constraints rc
+         ON rc.constraint_name = tc.constraint_name
+         AND rc.constraint_schema = tc.table_schema
        WHERE tc.constraint_type = 'FOREIGN KEY'
          AND tc.table_schema = '${schema}'
-         AND tc.table_name = '${tableName}'`,
+         AND tc.table_name = '${tableName}'
+       ORDER BY tc.constraint_name, kcu.ordinal_position`,
     );
 
+    const fkByName = new Map<string, TableForeignKey>();
+    for (const row of fkResult.rows) {
+      const existing = fkByName.get(row.constraint_name);
+      if (existing) {
+        existing.columns.push(row.column_name);
+        existing.refColumns.push(row.foreign_column_name);
+      } else {
+        fkByName.set(row.constraint_name, {
+          name: row.constraint_name,
+          columns: [row.column_name],
+          refTable: row.foreign_table_name,
+          refColumns: [row.foreign_column_name],
+          onDelete: row.delete_rule,
+          onUpdate: row.update_rule,
+        });
+      }
+    }
+    const foreignKeys = [...fkByName.values()];
+
     const fkMap = new Map(
-      fkResult.rows.map((r) => [
-        r.column_name,
-        { table: r.foreign_table_name, column: r.foreign_column_name },
-      ]),
+      foreignKeys.flatMap((fk) =>
+        fk.columns.map((col, i) => [
+          col,
+          { table: fk.refTable, column: fk.refColumns[i] ?? fk.refColumns[0] },
+        ]),
+      ),
     );
+
+    const uniqueResult = await this.drizzle.db.execute<{
+      constraint_name: string;
+      column_name: string;
+      ordinal_position: number;
+    }>(
+      `SELECT tc.constraint_name, kcu.column_name, kcu.ordinal_position
+       FROM information_schema.table_constraints tc
+       JOIN information_schema.key_column_usage kcu
+         ON tc.constraint_name = kcu.constraint_name
+         AND tc.table_schema = kcu.table_schema
+       WHERE tc.constraint_type = 'UNIQUE'
+         AND tc.table_schema = '${schema}'
+         AND tc.table_name = '${tableName}'
+       ORDER BY tc.constraint_name, kcu.ordinal_position`,
+    );
+
+    const uniqueByName = new Map<string, TableUniqueConstraint>();
+    for (const row of uniqueResult.rows) {
+      const existing = uniqueByName.get(row.constraint_name);
+      if (existing) existing.columns.push(row.column_name);
+      else {
+        uniqueByName.set(row.constraint_name, {
+          name: row.constraint_name,
+          columns: [row.column_name],
+        });
+      }
+    }
+    const uniqueConstraints = [...uniqueByName.values()];
+
+    const indexResult = await this.drizzle.db.execute<{
+      indexname: string;
+      indexdef: string;
+    }>(
+      `SELECT indexname, indexdef
+       FROM pg_indexes
+       WHERE schemaname = '${schema}'
+         AND tablename = '${tableName}'
+       ORDER BY indexname`,
+    );
+
+    const indexes: TableIndex[] = indexResult.rows.map((row) => {
+      const unique = /\bUNIQUE\b/i.test(row.indexdef);
+      const primary = row.indexname.endsWith('_pkey') || /\bPRIMARY KEY\b/i.test(row.indexdef);
+      const colsMatch = row.indexdef.match(/\(([^)]+)\)\s*$/);
+      const columns = colsMatch
+        ? colsMatch[1]
+            .split(',')
+            .map((c) => c.trim().replace(/"/g, ''))
+        : [];
+      return { name: row.indexname, columns, unique, primary };
+    });
+
+    const rlsResult = await this.drizzle.db.execute<{ relrowsecurity: boolean }>(
+      `SELECT c.relrowsecurity
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = '${schema}'
+         AND c.relname = '${tableName}'
+         AND c.relkind = 'r'`,
+    );
+
+    const policiesResult = await this.drizzle.db.execute<{
+      policyname: string;
+      cmd: string;
+      roles: string[];
+      qual: string | null;
+      with_check: string | null;
+      permissive: string;
+    }>(
+      `SELECT policyname, cmd, roles, qual, with_check, permissive
+       FROM pg_policies
+       WHERE schemaname = '${schema}'
+         AND tablename = '${tableName}'
+       ORDER BY policyname`,
+    );
+
+    const policies: TablePolicy[] = policiesResult.rows.map((p) => ({
+      name: p.policyname,
+      cmd: p.cmd,
+      roles: p.roles ?? [],
+      using: p.qual,
+      withCheck: p.with_check,
+      permissive: p.permissive === 'PERMISSIVE',
+    }));
 
     const columns: TableColumn[] = columnsResult.rows.map((col) => ({
       name: col.column_name,
@@ -173,7 +311,15 @@ export class TableEditorService {
       throw new NotFoundException(`Table "${tableName}" not found`);
     }
 
-    return { name: tableName, columns };
+    return {
+      name: tableName,
+      columns,
+      indexes,
+      uniqueConstraints,
+      foreignKeys,
+      rlsEnabled: Boolean(rlsResult.rows[0]?.relrowsecurity),
+      policies,
+    };
   }
 
   private isMissingTableError(err: unknown): boolean {
@@ -254,6 +400,7 @@ export class TableEditorService {
       parts.push(colDef);
 
       if (col.isPrimaryKey && pkCols.length === 1) parts.push('PRIMARY KEY');
+      if (col.unique && !col.isPrimaryKey) parts.push('UNIQUE');
       if (!col.isNullable && !col.isPrimaryKey) parts.push('NOT NULL');
       if (col.defaultValue) {
         parts.push(`DEFAULT ${this.formatDefault(col.defaultValue, col.type)}`);
@@ -313,10 +460,21 @@ export class TableEditorService {
     if (dto.defaultValue) {
       colDef += ` DEFAULT ${this.formatDefault(dto.defaultValue, dto.type)}`;
     }
+    if (dto.unique) colDef += ' UNIQUE';
 
     await this.drizzle.db.execute(
       `ALTER TABLE "${schema}"."${tableName}" ADD COLUMN ${colDef}`,
     );
+
+    if (dto.foreignKeyTable && dto.foreignKeyColumn) {
+      this.assertSafeIdentifier(dto.foreignKeyTable, 'foreign key table');
+      this.assertSafeIdentifier(dto.foreignKeyColumn, 'foreign key column');
+      await this.drizzle.db.execute(
+        `ALTER TABLE "${schema}"."${tableName}"
+         ADD FOREIGN KEY ("${dto.name}")
+         REFERENCES "${schema}"."${dto.foreignKeyTable}" ("${dto.foreignKeyColumn}")`,
+      );
+    }
   }
 
   // Drop column
@@ -434,5 +592,176 @@ export class TableEditorService {
 
     if (!result.rows[0]) throw new NotFoundException('Row not found');
     return result.rows[0];
+  }
+
+  async createIndex(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    dto: CreateIndexDto,
+  ): Promise<void> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    dto.columns.forEach((c) => this.assertSafeIdentifier(c, 'column name'));
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    const indexName =
+      dto.name ??
+      `${tableName}_${dto.columns.join('_')}_${dto.unique ? 'uidx' : 'idx'}`;
+    this.assertSafeIdentifier(indexName, 'index name');
+    const cols = dto.columns.map((c) => `"${c}"`).join(', ');
+    const unique = dto.unique ? 'UNIQUE ' : '';
+    await this.drizzle.db.execute(
+      `CREATE ${unique}INDEX "${indexName}" ON "${schema}"."${tableName}" (${cols})`,
+    );
+  }
+
+  async dropIndex(
+    orgSlug: string,
+    projectSlug: string,
+    indexName: string,
+  ): Promise<void> {
+    this.assertSafeIdentifier(indexName, 'index name');
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    await this.drizzle.db.execute(
+      `DROP INDEX IF EXISTS "${schema}"."${indexName}"`,
+    );
+  }
+
+  async createUniqueConstraint(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    dto: CreateUniqueConstraintDto,
+  ): Promise<void> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    dto.columns.forEach((c) => this.assertSafeIdentifier(c, 'column name'));
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    const name =
+      dto.name ?? `${tableName}_${dto.columns.join('_')}_key`;
+    this.assertSafeIdentifier(name, 'constraint name');
+    const cols = dto.columns.map((c) => `"${c}"`).join(', ');
+    await this.drizzle.db.execute(
+      `ALTER TABLE "${schema}"."${tableName}"
+       ADD CONSTRAINT "${name}" UNIQUE (${cols})`,
+    );
+  }
+
+  async dropConstraint(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    constraintName: string,
+  ): Promise<void> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    this.assertSafeIdentifier(constraintName, 'constraint name');
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    await this.drizzle.db.execute(
+      `ALTER TABLE "${schema}"."${tableName}"
+       DROP CONSTRAINT IF EXISTS "${constraintName}"`,
+    );
+  }
+
+  async createForeignKey(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    dto: CreateForeignKeyDto,
+  ): Promise<void> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    this.assertSafeIdentifier(dto.refTable, 'ref table');
+    dto.columns.forEach((c) => this.assertSafeIdentifier(c, 'column name'));
+    dto.refColumns.forEach((c) =>
+      this.assertSafeIdentifier(c, 'ref column name'),
+    );
+    if (dto.columns.length !== dto.refColumns.length) {
+      throw new BadRequestException(
+        'columns and refColumns must have the same length',
+      );
+    }
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    const name =
+      dto.name ?? `${tableName}_${dto.columns.join('_')}_fkey`;
+    this.assertSafeIdentifier(name, 'constraint name');
+    const cols = dto.columns.map((c) => `"${c}"`).join(', ');
+    const refs = dto.refColumns.map((c) => `"${c}"`).join(', ');
+    const onDelete = dto.onDelete ? ` ON DELETE ${dto.onDelete}` : '';
+    const onUpdate = dto.onUpdate ? ` ON UPDATE ${dto.onUpdate}` : '';
+    await this.drizzle.db.execute(
+      `ALTER TABLE "${schema}"."${tableName}"
+       ADD CONSTRAINT "${name}"
+       FOREIGN KEY (${cols})
+       REFERENCES "${schema}"."${dto.refTable}" (${refs})${onDelete}${onUpdate}`,
+    );
+  }
+
+  async setRls(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    dto: SetRlsDto,
+  ): Promise<void> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    await this.projectsService.ensureProjectRoles(schema);
+    const action = dto.enabled ? 'ENABLE' : 'DISABLE';
+    await this.drizzle.db.execute(
+      `ALTER TABLE "${schema}"."${tableName}" ${action} ROW LEVEL SECURITY`,
+    );
+    if (dto.enabled && dto.force) {
+      await this.drizzle.db.execute(
+        `ALTER TABLE "${schema}"."${tableName}" FORCE ROW LEVEL SECURITY`,
+      );
+    }
+    if (!dto.enabled) {
+      await this.drizzle.db.execute(
+        `ALTER TABLE "${schema}"."${tableName}" NO FORCE ROW LEVEL SECURITY`,
+      );
+    }
+  }
+
+  async createPolicy(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    dto: CreatePolicyDto,
+  ): Promise<void> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    this.assertSafeIdentifier(dto.name, 'policy name');
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    await this.projectsService.ensureProjectRoles(schema);
+    const roles =
+      dto.roles && dto.roles.length > 0
+        ? dto.roles
+            .map((r) => {
+              if (r === 'public' || r === 'PUBLIC') return 'PUBLIC';
+              if (r === 'anon') return `"${schema}_anon"`;
+              if (r === 'authenticated') return `"${schema}_authenticated"`;
+              this.assertSafeIdentifier(r.replace(/"/g, ''), 'role');
+              return `"${r}"`;
+            })
+            .join(', ')
+        : 'PUBLIC';
+    const permissive = dto.permissive === false ? 'AS RESTRICTIVE' : 'AS PERMISSIVE';
+    const using = dto.using ? ` USING (${dto.using})` : '';
+    const withCheck = dto.withCheck ? ` WITH CHECK (${dto.withCheck})` : '';
+    await this.drizzle.db.execute(
+      `CREATE POLICY "${dto.name}" ON "${schema}"."${tableName}"
+       ${permissive}
+       FOR ${dto.cmd}
+       TO ${roles}${using}${withCheck}`,
+    );
+  }
+
+  async dropPolicy(
+    orgSlug: string,
+    projectSlug: string,
+    tableName: string,
+    policyName: string,
+  ): Promise<void> {
+    this.assertSafeIdentifier(tableName, 'table name');
+    this.assertSafeIdentifier(policyName, 'policy name');
+    const schema = await this.getProjectSchema(orgSlug, projectSlug);
+    await this.drizzle.db.execute(
+      `DROP POLICY IF EXISTS "${policyName}" ON "${schema}"."${tableName}"`,
+    );
   }
 }

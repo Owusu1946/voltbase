@@ -119,9 +119,44 @@ export interface TableColumn {
   } | null;
 }
 
+export interface TableIndex {
+  name: string;
+  columns: string[];
+  unique: boolean;
+  primary: boolean;
+}
+
+export interface TableUniqueConstraint {
+  name: string;
+  columns: string[];
+}
+
+export interface TableForeignKey {
+  name: string;
+  columns: string[];
+  refTable: string;
+  refColumns: string[];
+  onDelete: string | null;
+  onUpdate: string | null;
+}
+
+export interface TablePolicy {
+  name: string;
+  cmd: string;
+  roles: string[];
+  using: string | null;
+  withCheck: string | null;
+  permissive: boolean;
+}
+
 export interface TableInfo {
   name: string;
   columns: TableColumn[];
+  indexes: TableIndex[];
+  uniqueConstraints: TableUniqueConstraint[];
+  foreignKeys: TableForeignKey[];
+  rlsEnabled: boolean;
+  policies: TablePolicy[];
 }
 
 export interface CreateColumnInput {
@@ -130,6 +165,7 @@ export interface CreateColumnInput {
   isNullable: boolean;
   isPrimaryKey: boolean;
   defaultValue?: string;
+  unique?: boolean;
   foreignKeyTable?: string;
   foreignKeyColumn?: string;
 }
@@ -181,7 +217,30 @@ export interface QueryHistoryItem {
   createdAt: string;
 }
 
+// PROJECT MIGRATIONS
+export interface ProjectMigration {
+  id: string;
+  projectId: string;
+  version: number;
+  name: string;
+  sql: string;
+  checksum: string;
+  appliedAt: string;
+  appliedBy: string | null;
+}
+
 export type RealtimeEventType = 'INSERT' | 'UPDATE' | 'DELETE';
+
+export type RealtimeCdcEventFilter = RealtimeEventType | '*';
+
+/** CDC subscribe body — string table name still accepted by the gateway. */
+export interface RealtimeSubscribePayload {
+  table: string;
+  /** Defaults to `*` (all event types). */
+  event?: RealtimeCdcEventFilter;
+  /** Equality-only filters matched against the row (`record` / `oldRecord`). */
+  filter?: Record<string, string>;
+}
 
 export interface RealtimeEvent {
   type: RealtimeEventType;
@@ -191,6 +250,19 @@ export interface RealtimeEvent {
   projectId: string;
   timestamp: string;
 }
+
+export interface RealtimeBroadcastMessage {
+  topic: string;
+  event: string;
+  payload: unknown;
+}
+
+export interface RealtimePresenceTrackPayload {
+  topic: string;
+  payload?: Record<string, unknown>;
+}
+
+export type RealtimePresenceState = Record<string, Record<string, unknown>>;
 
 // Storage
 export type BucketAccess = 'public' | 'private';
@@ -239,6 +311,19 @@ export interface SignInInput {
 
 export interface MagicLinkInput {
   email: string;
+}
+
+export interface ResendVerificationInput {
+  email: string;
+}
+
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  password: string;
 }
 
 export interface ProjectOAuthSettings {

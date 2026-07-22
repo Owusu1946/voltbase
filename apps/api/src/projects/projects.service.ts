@@ -49,10 +49,78 @@ export class ProjectsService {
 
   private async provisionSchema(dbSchema: string): Promise<void> {
     await this.drizzle.db.execute(`CREATE SCHEMA IF NOT EXISTS "${dbSchema}"`);
+    await this.ensureProjectRoles(dbSchema);
+  }
+
+  /** Create anon/authenticated NOLOGIN roles + uid() helper for RLS. Idempotent. */
+  async ensureProjectRoles(dbSchema: string): Promise<void> {
+    const anon = `${dbSchema}_anon`;
+    const auth = `${dbSchema}_authenticated`;
+
+    await this.drizzle.db.execute(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${anon}') THEN
+          CREATE ROLE "${anon}" NOLOGIN NOINHERIT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${auth}') THEN
+          CREATE ROLE "${auth}" NOLOGIN NOINHERIT;
+        END IF;
+      END
+      $$;
+    `);
+
+    await this.drizzle.db.execute(
+      `GRANT USAGE ON SCHEMA "${dbSchema}" TO "${anon}", "${auth}"`,
+    );
+    await this.drizzle.db.execute(
+      `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "${dbSchema}" TO "${anon}", "${auth}"`,
+    );
+    await this.drizzle.db.execute(
+      `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA "${dbSchema}" TO "${anon}", "${auth}"`,
+    );
+    await this.drizzle.db.execute(
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA "${dbSchema}"
+       GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "${anon}", "${auth}"`,
+    );
+    await this.drizzle.db.execute(
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA "${dbSchema}"
+       GRANT USAGE, SELECT ON SEQUENCES TO "${anon}", "${auth}"`,
+    );
+    await this.drizzle.db.execute(
+      `GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA "${dbSchema}" TO "${anon}", "${auth}"`,
+    );
+    await this.drizzle.db.execute(
+      `ALTER DEFAULT PRIVILEGES IN SCHEMA "${dbSchema}"
+       GRANT EXECUTE ON FUNCTIONS TO "${anon}", "${auth}"`,
+    );
+
+    // Allow the connection role to assume these roles
+    await this.drizzle.db.execute(
+      `GRANT "${anon}", "${auth}" TO CURRENT_USER`,
+    );
+
+    await this.drizzle.db.execute(`
+      CREATE OR REPLACE FUNCTION "${dbSchema}".uid()
+      RETURNS uuid
+      LANGUAGE sql
+      STABLE
+      AS $fn$
+        SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
+      $fn$;
+    `);
+
+    await this.drizzle.db.execute(
+      `GRANT EXECUTE ON FUNCTION "${dbSchema}".uid() TO "${anon}", "${auth}"`,
+    );
   }
 
   private async dropSchema(dbSchema: string): Promise<void> {
     await this.drizzle.db.execute(`DROP SCHEMA IF EXISTS "${dbSchema}" CASCADE`);
+    const anon = `${dbSchema}_anon`;
+    const auth = `${dbSchema}_authenticated`;
+    await this.drizzle.db.execute(`DROP ROLE IF EXISTS "${anon}"`);
+    await this.drizzle.db.execute(`DROP ROLE IF EXISTS "${auth}"`);
   }
 
   private async resolveProject(
