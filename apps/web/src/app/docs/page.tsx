@@ -27,10 +27,16 @@ export default function DocsHomePage() {
             Quickstart
           </Link>
           <Link
-            href="/docs/examples/todo-rls"
+            href="/docs/frameworks/nextjs"
             className="rounded-md border border-[#d4d4d4] bg-white px-4 py-2 text-sm font-medium text-[#1c1c1c] transition hover:border-[#a3a3a3]"
           >
-            Todo + RLS example
+            Next.js guide
+          </Link>
+          <Link
+            href="/docs/frameworks"
+            className="rounded-md border border-[#d4d4d4] bg-white px-4 py-2 text-sm font-medium text-[#1c1c1c] transition hover:border-[#a3a3a3]"
+          >
+            All frameworks
           </Link>
         </div>
       </div>

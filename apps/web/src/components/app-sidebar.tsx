@@ -16,6 +16,7 @@ import {
   LogOut,
   TerminalIcon,
   GitBranch,
+  Puzzle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -46,6 +47,7 @@ const orgNavItem = { icon: Home, label: 'Home', segment: 'projects' } as const;
 
 const projectNavItems = [
   { icon: Table2, label: 'Database', segment: 'database' },
+  { icon: Puzzle, label: 'Extensions', segment: 'extensions' },
   { icon: TerminalIcon, label: 'SQL', segment: 'sql' },
   { icon: GitBranch, label: 'Migrations', segment: 'migrations' },
   { icon: ShieldCheck, label: 'Auth', segment: 'auth' },

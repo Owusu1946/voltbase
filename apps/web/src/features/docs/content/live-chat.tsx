@@ -1,6 +1,15 @@
 import type { DocEntry } from '../registry';
 import { CodeBlock } from '../code-block';
 import { Callout } from '../docs-ui';
+import {
+  FrameworkCode,
+  FrameworkProvider,
+  FrameworkTabs,
+} from '../framework-switcher';
+import {
+  chatPresenceSnippets,
+  chatRealtimeSnippets,
+} from './example-snippets-chat';
 
 export const LiveChatPage: DocEntry = {
   title: 'Live chat',
@@ -12,10 +21,11 @@ export const LiveChatPage: DocEntry = {
     { id: 'presence', title: '3. Presence' },
   ],
   render: () => (
-    <>
+    <FrameworkProvider>
       <h2 id="schema">1. Schema</h2>
       <CodeBlock
         language="sql"
+        filename="schema.sql"
         code={`CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room TEXT NOT NULL,
@@ -29,40 +39,16 @@ export const LiveChatPage: DocEntry = {
       </p>
 
       <h2 id="realtime">2. Realtime</h2>
-      <CodeBlock
-        language="ts"
-        code={`const admin = createClient(projectUrl, serviceRoleKey);
-
-voltbase.realtime.subscribe(
-  'messages',
-  (event) => {
-    if (event.type === 'INSERT') appendMessage(event.record);
-  },
-  { event: 'INSERT', filter: { room: 'lobby' } },
-);
-
-await admin.from('messages').insert({
-  room: 'lobby',
-  author: 'alice',
-  body: 'Hello!',
-});`}
-      />
+      <p>Pick your framework — selection is remembered across examples.</p>
+      <FrameworkTabs />
+      <FrameworkCode snippets={chatRealtimeSnippets} />
 
       <h2 id="presence">3. Presence</h2>
-      <CodeBlock
-        language="ts"
-        code={`const channel = voltbase.realtime.channel('lobby');
-
-channel
-  .on('presence', { event: 'sync' }, ({ state }) => setOnline(state))
-  .subscribe();
-
-channel.track({ user: 'alice' });`}
-      />
+      <FrameworkCode snippets={chatPresenceSnippets} />
       <Callout variant="warn">
         Presence is in-memory on a single API instance — fine for demos and
         single-replica deploys.
       </Callout>
-    </>
+    </FrameworkProvider>
   ),
 };

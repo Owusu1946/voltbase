@@ -17,7 +17,11 @@ export const DashboardTourPage: DocEntry = {
         <tbody>
           <tr>
             <td>Database</td>
-            <td>Table editor, rows, indexes, FKs, unique, RLS policies</td>
+            <td>Table editor, rows, indexes (incl. HNSW), FKs, unique, RLS policies</td>
+          </tr>
+          <tr>
+            <td>Extensions</td>
+            <td>Postgres extensions (pgvector for embeddings)</td>
           </tr>
           <tr>
             <td>SQL</td>

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DOCS_NAV, type DocsNavGroup } from './nav';
+import { DocsSearchBox } from './docs-search';
 
 const STORAGE_KEY = 'voltbase.docs.nav';
 
@@ -75,19 +76,7 @@ export function DocsNavTree({
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      <div className="relative">
-        <Search
-          size={14}
-          className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[#8c8c8c]"
-        />
-        <input
-          type="search"
-          disabled
-          placeholder="Search docs…"
-          title="Coming soon"
-          className="w-full cursor-not-allowed rounded-md border border-[#e6e6e6] bg-[#f5f5f5] py-2 pr-3 pl-8 text-sm text-[#8c8c8c] outline-none"
-        />
-      </div>
+      <DocsSearchBox onNavigate={onNavigate} />
 
       <nav className="flex flex-col gap-1" aria-label="Documentation">
         {DOCS_NAV.map((group) => {

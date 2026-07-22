@@ -81,10 +81,17 @@ export async function tableEditorAction(
       }
 
       case TABLE_EDITOR_INTENT.ADD_COLUMN: {
-        const { tableName, name, type, defaultValue } = parsed.data;
+        const { tableName, name, type, defaultValue, vectorDimensions } =
+          parsed.data;
         await apiClient.patch(
           `${base}/${tableName}/columns`,
-          { name, type, defaultValue: defaultValue || undefined },
+          {
+            name,
+            type,
+            defaultValue: defaultValue || undefined,
+            vectorDimensions:
+              type === 'vector' ? vectorDimensions : undefined,
+          },
           opts,
         );
         return { success: 'Column added!', tableName };

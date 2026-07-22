@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { COLUMN_TYPES, TABLE_EDITOR_INTENT } from '@voltbase/constants';
+import { COLUMN_TYPES, TABLE_EDITOR_INTENT, DEFAULT_VECTOR_DIMENSIONS } from '@voltbase/constants';
 import type { ColumnType } from '@voltbase/types';
 import { tableEditorAction } from '@/features/table-editor/action';
 import { cn } from '@/lib/utils';
@@ -42,6 +42,9 @@ export function AddColumnDialog({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [type, setType] = useState<ColumnType>('text');
+  const [vectorDimensions, setVectorDimensions] = useState(
+    String(DEFAULT_VECTOR_DIMENSIONS),
+  );
   const [defaultValue, setDefaultValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -49,6 +52,7 @@ export function AddColumnDialog({
   const reset = () => {
     setName('');
     setType('text');
+    setVectorDimensions(String(DEFAULT_VECTOR_DIMENSIONS));
     setDefaultValue('');
     setError(null);
   };
@@ -63,6 +67,9 @@ export function AddColumnDialog({
     formData.set('tableName', tableName);
     formData.set('name', name);
     formData.set('type', type);
+    if (type === 'vector') {
+      formData.set('vectorDimensions', vectorDimensions);
+    }
     if (defaultValue.trim()) formData.set('defaultValue', defaultValue.trim());
 
     const result = await tableEditorAction(
@@ -149,6 +156,21 @@ export function AddColumnDialog({
                   </SelectContent>
                 </Select>
               </Field>
+
+              {type === 'vector' ? (
+                <Field>
+                  <FieldLabel htmlFor="vector-dims">Dimensions</FieldLabel>
+                  <Input
+                    id="vector-dims"
+                    type="number"
+                    min={1}
+                    max={2000}
+                    value={vectorDimensions}
+                    onChange={(e) => setVectorDimensions(e.target.value)}
+                    className="font-mono"
+                  />
+                </Field>
+              ) : null}
 
               <Field>
                 <FieldLabel htmlFor="column-default">Default (optional)</FieldLabel>

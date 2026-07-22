@@ -52,6 +52,21 @@ export class ProjectApiService {
     if (typeof value === 'string') {
       return `'${value.replace(/'/g, "''")}'`;
     }
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        throw new BadRequestException({
+          message: 'Empty arrays are not supported; use a typed vector literal',
+          code: 'invalid_value',
+        });
+      }
+      if (value.every((v) => typeof v === 'number' && Number.isFinite(v))) {
+        return `'[${value.join(',')}]'::vector`;
+      }
+      throw new BadRequestException({
+        message: 'Only number[] arrays can be cast to vector',
+        code: 'invalid_value',
+      });
+    }
     if (typeof value === 'object') {
       return `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`;
     }

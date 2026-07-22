@@ -6,6 +6,10 @@ import {
   IsString,
   ArrayMinSize,
 } from 'class-validator';
+import {
+  VECTOR_INDEX_METHODS,
+  VECTOR_INDEX_OPS,
+} from '@voltbase/constants';
 
 export class CreateIndexDto {
   @IsOptional()
@@ -20,6 +24,14 @@ export class CreateIndexDto {
   @IsOptional()
   @IsBoolean()
   unique?: boolean;
+
+  @IsOptional()
+  @IsIn(VECTOR_INDEX_METHODS)
+  method?: (typeof VECTOR_INDEX_METHODS)[number];
+
+  @IsOptional()
+  @IsIn(VECTOR_INDEX_OPS)
+  ops?: (typeof VECTOR_INDEX_OPS)[number];
 }
 
 export class CreateUniqueConstraintDto {

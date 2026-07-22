@@ -1,4 +1,13 @@
-import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { COLUMN_TYPES } from '@voltbase/constants';
 import type { ColumnType } from '@voltbase/types';
 
@@ -24,4 +33,11 @@ export class AddColumnDto {
   @IsOptional()
   @IsString()
   foreignKeyColumn?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  @Type(() => Number)
+  vectorDimensions?: number;
 }

@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import { randomBytes } from 'crypto';
@@ -16,12 +18,58 @@ import { PROJECT_KEY_ROLES } from '@voltbase/constants';
 import type { Project } from '../db/schema/projects';
 
 @Injectable()
-export class ProjectsService {
+export class ProjectsService implements OnModuleInit {
+  private readonly logger = new Logger(ProjectsService.name);
+
   constructor(
     private drizzle: DrizzleService,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
+
+  async onModuleInit() {
+    try {
+      await this.ensureVectorExtension();
+    } catch (err) {
+      this.logger.warn(
+        `pgvector not enabled at startup: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** Enable Neon pgvector once per database (shared by all project schemas). */
+  async ensureVectorExtension(): Promise<{ enabled: boolean; version: string | null }> {
+    try {
+      await this.drizzle.db.execute(
+        `CREATE EXTENSION IF NOT EXISTS vector`,
+      );
+      // Allow project anon/authenticated roles to cast and use the type
+      await this.drizzle.db.execute(
+        `GRANT USAGE ON TYPE public.vector TO PUBLIC`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException({
+        message:
+          'Failed to enable pgvector. Ensure the database role can CREATE EXTENSION vector.',
+        code: 'vector_extension_failed',
+        details: message,
+      });
+    }
+
+    return this.getVectorExtensionStatus();
+  }
+
+  async getVectorExtensionStatus(): Promise<{
+    enabled: boolean;
+    version: string | null;
+  }> {
+    const result = await this.drizzle.db.execute<{ extversion: string }>(
+      `SELECT extversion FROM pg_extension WHERE extname = 'vector' LIMIT 1`,
+    );
+    const version = result.rows[0]?.extversion ?? null;
+    return { enabled: Boolean(version), version };
+  }
 
   private generateProjectSlug(name: string): string {
     const base = slugify(name, { lower: true, strict: true });
@@ -48,6 +96,7 @@ export class ProjectsService {
   }
 
   private async provisionSchema(dbSchema: string): Promise<void> {
+    await this.ensureVectorExtension();
     await this.drizzle.db.execute(`CREATE SCHEMA IF NOT EXISTS "${dbSchema}"`);
     await this.ensureProjectRoles(dbSchema);
   }
@@ -72,6 +121,10 @@ export class ProjectsService {
 
     await this.drizzle.db.execute(
       `GRANT USAGE ON SCHEMA "${dbSchema}" TO "${anon}", "${auth}"`,
+    );
+    // pgvector type lives in public — roles need USAGE to cast/insert embeddings
+    await this.drizzle.db.execute(
+      `GRANT USAGE ON SCHEMA public TO "${anon}", "${auth}"`,
     );
     await this.drizzle.db.execute(
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "${dbSchema}" TO "${anon}", "${auth}"`,

@@ -14,6 +14,7 @@ import { MigrationsModule } from './migrations/migrations.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { StorageModule } from './storage/storage.module';
 import { ProjectAuthModule } from './project-auth/project-auth.module';
+import { ExtensionsModule } from './extensions/extensions.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ProjectAuthModule } from './project-auth/project-auth.module';
     RealtimeModule,
     StorageModule,
     ProjectAuthModule,
+    ExtensionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

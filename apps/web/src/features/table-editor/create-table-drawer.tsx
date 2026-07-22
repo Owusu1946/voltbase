@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect } from 'react';
-import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Trash2 } from 'lucide-react';
@@ -27,7 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { COLUMN_TYPES, TABLE_EDITOR_INTENT } from '@voltbase/constants';
+import {
+  COLUMN_TYPES,
+  TABLE_EDITOR_INTENT,
+  DEFAULT_VECTOR_DIMENSIONS,
+} from '@voltbase/constants';
 import type { ColumnType } from '@voltbase/types';
 import { createTableSchema } from '@/features/table-editor/client.schema';
 import { tableEditorAction } from '@/features/table-editor/action';
@@ -235,6 +239,7 @@ export function CreateTableDrawer({
                       defaultValue: '',
                       foreignKeyTable: '',
                       foreignKeyColumn: '',
+                      vectorDimensions: DEFAULT_VECTOR_DIMENSIONS,
                     })
                   }
                 >
@@ -417,28 +422,52 @@ function ColumnTypeSelect({
   index: number;
   control: ReturnType<typeof useForm<CreateTableValues>>['control'];
 }) {
+  const type = useWatch({ control, name: `columns.${index}.type` });
+
   return (
-    <Controller
-      name={`columns.${index}.type`}
-      control={control}
-      render={({ field }) => (
-        <Select
-          value={field.value}
-          onValueChange={(v) => field.onChange(v as ColumnType)}
-        >
-          <SelectTrigger className="h-8 w-full min-w-0 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {COLUMN_TYPES.map((t) => (
-              <SelectItem key={t} value={t} className="font-mono text-xs">
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-    />
+    <div className="flex min-w-0 flex-col gap-1">
+      <Controller
+        name={`columns.${index}.type`}
+        control={control}
+        render={({ field }) => (
+          <Select
+            value={field.value}
+            onValueChange={(v) => {
+              field.onChange(v as ColumnType);
+            }}
+          >
+            <SelectTrigger className="h-8 w-full min-w-0 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COLUMN_TYPES.map((t) => (
+                <SelectItem key={t} value={t} className="font-mono text-xs">
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      />
+      {type === 'vector' ? (
+        <Controller
+          name={`columns.${index}.vectorDimensions`}
+          control={control}
+          defaultValue={DEFAULT_VECTOR_DIMENSIONS}
+          render={({ field }) => (
+            <Input
+              type="number"
+              min={1}
+              max={2000}
+              className="h-7 font-mono text-[11px]"
+              placeholder="dims"
+              value={field.value ?? DEFAULT_VECTOR_DIMENSIONS}
+              onChange={(e) => field.onChange(Number(e.target.value))}
+            />
+          )}
+        />
+      ) : null}
+    </div>
   );
 }
 

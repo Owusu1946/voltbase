@@ -1,6 +1,13 @@
+import Link from 'next/link';
 import type { DocEntry } from '../registry';
 import { CodeBlock } from '../code-block';
 import { Callout } from '../docs-ui';
+import {
+  FrameworkCode,
+  FrameworkProvider,
+  FrameworkTabs,
+} from '../framework-switcher';
+import { todoClientSnippets } from './example-snippets-todo';
 
 export const TodoRlsPage: DocEntry = {
   title: 'Todo + RLS',
@@ -12,7 +19,7 @@ export const TodoRlsPage: DocEntry = {
     { id: 'client', title: '3. Client' },
   ],
   render: () => (
-    <>
+    <FrameworkProvider>
       <Callout title="What you'll build">
         Sign up → create todos scoped to <code>uid()</code> → list only your
         rows using the anon key + session.
@@ -22,6 +29,7 @@ export const TodoRlsPage: DocEntry = {
       <p>Run in SQL editor or Migrations:</p>
       <CodeBlock
         language="sql"
+        filename="schema.sql"
         code={`CREATE TABLE todos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
@@ -36,6 +44,7 @@ CREATE INDEX todos_user_id_idx ON todos (user_id);`}
       <h2 id="policies">2. Policies</h2>
       <CodeBlock
         language="sql"
+        filename="policies.sql"
         code={`ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users manage own todos"
@@ -52,26 +61,13 @@ CREATE POLICY "users manage own todos"
       </p>
 
       <h2 id="client">3. Client</h2>
-      <CodeBlock
-        language="ts"
-        code={`import { createClient } from 'voltbase-js';
-
-const voltbase = createClient(projectUrl, anonKey);
-
-await voltbase.auth.signUp({ email, password });
-const user = voltbase.auth.getUser();
-
-await voltbase.from('todos').insert({
-  user_id: user!.id,
-  title: 'Ship docs',
-});
-
-const { data } = await voltbase
-  .from('todos')
-  .select('*')
-  .order('created_at', 'desc');
-// Only this user's rows — X-User-Jwt is sent automatically`}
-      />
-    </>
+      <p>Pick your framework — selection is remembered across examples.</p>
+      <FrameworkTabs />
+      <FrameworkCode snippets={todoClientSnippets} />
+      <Callout variant="tip">
+        Need env + client setup first? See the matching{' '}
+        <Link href="/docs/frameworks">framework quickstart</Link>.
+      </Callout>
+    </FrameworkProvider>
   ),
 };

@@ -2,8 +2,11 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -44,6 +47,13 @@ export class CreateColumnDto implements CreateColumnInput {
   @IsString()
   @IsOptional()
   foreignKeyColumn?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  @Type(() => Number)
+  vectorDimensions?: number;
 }
 
 export class CreateTableDto implements CreateTableInput {

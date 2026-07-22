@@ -89,7 +89,9 @@ const { data, error } = await admin.from('products').insert({
 });`}
       />
       <p>
-        Next: <Link href="/docs/javascript/auth">Auth</Link> or{' '}
+        Next: pick a{' '}
+        <Link href="/docs/frameworks">framework quickstart</Link>, read{' '}
+        <Link href="/docs/javascript/auth">Auth</Link>, or try the{' '}
         <Link href="/docs/examples/todo-rls">Todo + RLS example</Link>.
       </p>
     </>

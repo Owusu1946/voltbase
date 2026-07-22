@@ -105,7 +105,8 @@ export type ColumnType =
   | 'timestamp'
   | 'uuid'
   | 'jsonb'
-  | 'numeric';
+  | 'numeric'
+  | 'vector';
 
 export interface TableColumn {
   name: string;
@@ -113,6 +114,8 @@ export interface TableColumn {
   isNullable: boolean;
   isPrimaryKey: boolean;
   defaultValue: string | null;
+  /** Present when type is vector (e.g. 1536). */
+  vectorDimensions?: number | null;
   foreignKey: {
     table: string;
     column: string;
@@ -124,6 +127,7 @@ export interface TableIndex {
   columns: string[];
   unique: boolean;
   primary: boolean;
+  method?: string | null;
 }
 
 export interface TableUniqueConstraint {
@@ -168,6 +172,8 @@ export interface CreateColumnInput {
   unique?: boolean;
   foreignKeyTable?: string;
   foreignKeyColumn?: string;
+  /** Required/used when type is vector. Defaults to 1536. */
+  vectorDimensions?: number;
 }
 
 export interface CreateTableInput {

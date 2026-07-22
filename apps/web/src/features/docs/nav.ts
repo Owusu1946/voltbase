@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Blocks,
   BookMarked,
+  Layers,
 } from 'lucide-react';
 
 export type DocsNavItem = {
@@ -36,10 +37,26 @@ export const DOCS_NAV: DocsNavGroup[] = [
     ],
   },
   {
+    id: 'frameworks',
+    title: 'Framework Quickstarts',
+    icon: Layers,
+    defaultOpen: true,
+    items: [
+      { title: 'Overview', href: '/docs/frameworks' },
+      { title: 'Next.js', href: '/docs/frameworks/nextjs' },
+      { title: 'React', href: '/docs/frameworks/react' },
+      { title: 'Vue', href: '/docs/frameworks/vue' },
+      { title: 'Nuxt', href: '/docs/frameworks/nuxt' },
+      { title: 'SvelteKit', href: '/docs/frameworks/sveltekit' },
+      { title: 'Astro', href: '/docs/frameworks/astro' },
+      { title: 'Expo', href: '/docs/frameworks/expo' },
+      { title: 'Hono', href: '/docs/frameworks/hono' },
+    ],
+  },
+  {
     id: 'javascript',
     title: 'JavaScript',
     icon: Code2,
-    defaultOpen: true,
     items: [
       { title: 'Install', href: '/docs/javascript/install' },
       { title: 'Database', href: '/docs/javascript/database' },
@@ -70,6 +87,7 @@ export const DOCS_NAV: DocsNavGroup[] = [
       },
       { title: 'Row Level Security', href: '/docs/database/rls' },
       { title: 'Keys & roles', href: '/docs/database/keys' },
+      { title: 'Vectors (pgvector)', href: '/docs/database/vectors' },
     ],
   },
   {
@@ -86,6 +104,7 @@ export const DOCS_NAV: DocsNavGroup[] = [
       { title: 'Todo + RLS', href: '/docs/examples/todo-rls' },
       { title: 'Live chat', href: '/docs/examples/live-chat' },
       { title: 'Avatar gallery', href: '/docs/examples/avatar-gallery' },
+      { title: 'Semantic search', href: '/docs/examples/semantic-search' },
     ],
   },
   {

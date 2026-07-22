@@ -13,7 +13,13 @@ export async function createIndexAction(
   orgSlug: string,
   projectSlug: string,
   tableName: string,
-  body: { name?: string; columns: string[]; unique?: boolean },
+  body: {
+    name?: string;
+    columns: string[];
+    unique?: boolean;
+    method?: string;
+    ops?: string;
+  },
 ): Promise<Result> {
   try {
     await apiClient.post(

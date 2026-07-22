@@ -229,6 +229,29 @@ channel.unsubscribe();
 
 ---
 
+## Vectors (pgvector)
+
+Store embeddings in a `vector(n)` column and search with a SQL `match_*` function + `rpc()` (same pattern as Supabase JS).
+
+```ts
+// Insert — pass number[] (must match column dimensions, e.g. 1536)
+await voltbase.from('documents').insert({
+  content: 'Reset your password…',
+  embedding, // number[]
+});
+
+// Similarity search
+const { data, error } = await voltbase.rpc('match_documents', {
+  query_embedding: queryVec,
+  match_threshold: 0.78,
+  match_count: 10,
+});
+```
+
+Create the function and HNSW index in the SQL editor — see product docs under **Database → Vectors**.
+
+---
+
 ## Client surface
 
 ```ts

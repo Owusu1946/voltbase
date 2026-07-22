@@ -23,7 +23,8 @@ export const LimitationsPage: DocEntry = {
           <code>.eq(&apos;id&apos;, …)</code>
         </li>
         <li>
-          <strong>Docs search</strong> UI is a stub (coming soon)
+          <strong>No hosted embedding API</strong> — generate vectors with
+          OpenAI/HF/etc.; Voltbase stores and queries them via pgvector
         </li>
         <li>
           <strong>Storage RLS</strong> is not implemented yet — protect buckets

@@ -17,6 +17,7 @@ import type {
   TableForeignKey,
   TablePolicy,
 } from '@voltbase/types';
+import { DEFAULT_VECTOR_DIMENSIONS } from '@voltbase/constants';
 import {
   CreateIndexDto,
   CreateUniqueConstraintDto,
@@ -40,7 +41,13 @@ export class TableEditorService {
   }
 
   //   Type mapping
-  private mapPgTypeToColumnType(pgType: string): ColumnType {
+  private mapPgTypeToColumnType(
+    pgType: string,
+    udtName?: string | null,
+  ): ColumnType {
+    if (udtName === 'vector' || pgType === 'USER-DEFINED') {
+      if (udtName === 'vector') return 'vector';
+    }
     const map: Record<string, ColumnType> = {
       text: 'text',
       'character varying': 'text',
@@ -52,11 +59,28 @@ export class TableEditorService {
       uuid: 'uuid',
       jsonb: 'jsonb',
       numeric: 'numeric',
+      USER_DEFINED: 'text',
     };
+    if (udtName === 'vector') return 'vector';
     return map[pgType] ?? 'text';
   }
 
-  private mapType(type: string): string {
+  private clampVectorDimensions(dims?: number | null): number {
+    const n = dims ?? DEFAULT_VECTOR_DIMENSIONS;
+    if (!Number.isFinite(n) || n < 1 || n > 2000) {
+      throw new BadRequestException({
+        message: 'vectorDimensions must be an integer between 1 and 2000',
+        code: 'invalid_vector_dimensions',
+      });
+    }
+    return Math.floor(n);
+  }
+
+  private mapType(type: string, vectorDimensions?: number): string {
+    if (type === 'vector') {
+      const dims = this.clampVectorDimensions(vectorDimensions);
+      return `vector(${dims})`;
+    }
     const map: Record<string, string> = {
       text: 'TEXT',
       integer: 'INTEGER',
@@ -68,6 +92,12 @@ export class TableEditorService {
       numeric: 'NUMERIC',
     };
     return map[type] ?? 'TEXT';
+  }
+
+  private parseVectorDimensions(formatType: string | null | undefined): number | null {
+    if (!formatType) return null;
+    const match = formatType.match(/^vector\((\d+)\)$/i);
+    return match ? Number(match[1]) : null;
   }
 
   private formatDefault(value: string, type: ColumnType): string {
@@ -129,14 +159,25 @@ export class TableEditorService {
     const columnsResult = await this.drizzle.db.execute<{
       column_name: string;
       data_type: string;
+      udt_name: string;
+      format_type: string;
       is_nullable: string;
       column_default: string | null;
     }>(
-      `SELECT column_name, data_type, is_nullable, column_default
-       FROM information_schema.columns
-       WHERE table_schema = '${schema}'
-         AND table_name = '${tableName}'
-       ORDER BY ordinal_position ASC`,
+      `SELECT
+         c.column_name,
+         c.data_type,
+         c.udt_name,
+         format_type(a.atttypid, a.atttypmod) AS format_type,
+         c.is_nullable,
+         c.column_default
+       FROM information_schema.columns c
+       JOIN pg_namespace n ON n.nspname = c.table_schema
+       JOIN pg_class cls ON cls.relnamespace = n.oid AND cls.relname = c.table_name
+       JOIN pg_attribute a ON a.attrelid = cls.oid AND a.attname = c.column_name AND NOT a.attisdropped
+       WHERE c.table_schema = '${schema}'
+         AND c.table_name = '${tableName}'
+       ORDER BY c.ordinal_position ASC`,
     );
 
     const pkResult = await this.drizzle.db.execute<{ column_name: string }>(
@@ -256,13 +297,21 @@ export class TableEditorService {
     const indexes: TableIndex[] = indexResult.rows.map((row) => {
       const unique = /\bUNIQUE\b/i.test(row.indexdef);
       const primary = row.indexname.endsWith('_pkey') || /\bPRIMARY KEY\b/i.test(row.indexdef);
+      const methodMatch = row.indexdef.match(/USING\s+(\w+)/i);
+      const method = methodMatch?.[1]?.toLowerCase() ?? 'btree';
       const colsMatch = row.indexdef.match(/\(([^)]+)\)\s*$/);
       const columns = colsMatch
         ? colsMatch[1]
             .split(',')
-            .map((c) => c.trim().replace(/"/g, ''))
+            .map((c) =>
+              c
+                .trim()
+                .replace(/"/g, '')
+                .replace(/\s+vector_\w+_ops$/i, '')
+                .trim(),
+            )
         : [];
-      return { name: row.indexname, columns, unique, primary };
+      return { name: row.indexname, columns, unique, primary, method };
     });
 
     const rlsResult = await this.drizzle.db.execute<{ relrowsecurity: boolean }>(
@@ -298,14 +347,21 @@ export class TableEditorService {
       permissive: p.permissive === 'PERMISSIVE',
     }));
 
-    const columns: TableColumn[] = columnsResult.rows.map((col) => ({
-      name: col.column_name,
-      type: this.mapPgTypeToColumnType(col.data_type),
-      isNullable: col.is_nullable === 'YES',
-      isPrimaryKey: pkColumns.has(col.column_name),
-      defaultValue: col.column_default,
-      foreignKey: fkMap.get(col.column_name) ?? null,
-    }));
+    const columns: TableColumn[] = columnsResult.rows.map((col) => {
+      const type = this.mapPgTypeToColumnType(col.data_type, col.udt_name);
+      return {
+        name: col.column_name,
+        type,
+        isNullable: col.is_nullable === 'YES',
+        isPrimaryKey: pkColumns.has(col.column_name),
+        defaultValue: col.column_default,
+        vectorDimensions:
+          type === 'vector'
+            ? this.parseVectorDimensions(col.format_type)
+            : null,
+        foreignKey: fkMap.get(col.column_name) ?? null,
+      };
+    });
 
     if (columns.length === 0) {
       throw new NotFoundException(`Table "${tableName}" not found`);
@@ -376,6 +432,9 @@ export class TableEditorService {
     dto: CreateTableDto,
   ): Promise<void> {
     this.assertSafeIdentifier(dto.name, 'table name');
+    if (dto.columns.some((c) => c.type === 'vector')) {
+      await this.projectsService.ensureVectorExtension();
+    }
     const schema = await this.getProjectSchema(orgSlug, projectSlug);
 
     const pkCols = dto.columns.filter((c) => c.isPrimaryKey);
@@ -391,7 +450,7 @@ export class TableEditorService {
       }
 
       const parts: string[] = [];
-      let colDef = `"${col.name}" ${this.mapType(col.type)}`;
+      let colDef = `"${col.name}" ${this.mapType(col.type, col.vectorDimensions)}`;
 
       if (col.isPrimaryKey && col.type === 'bigint' && !col.defaultValue) {
         colDef += ' GENERATED ALWAYS AS IDENTITY';
@@ -454,9 +513,12 @@ export class TableEditorService {
   ): Promise<void> {
     this.assertSafeIdentifier(tableName, 'table name');
     this.assertSafeIdentifier(dto.name, 'column name');
+    if (dto.type === 'vector') {
+      await this.projectsService.ensureVectorExtension();
+    }
     const schema = await this.getProjectSchema(orgSlug, projectSlug);
 
-    let colDef = `"${dto.name}" ${this.mapType(dto.type)}`;
+    let colDef = `"${dto.name}" ${this.mapType(dto.type, dto.vectorDimensions)}`;
     if (dto.defaultValue) {
       colDef += ` DEFAULT ${this.formatDefault(dto.defaultValue, dto.type)}`;
     }
@@ -607,10 +669,42 @@ export class TableEditorService {
       dto.name ??
       `${tableName}_${dto.columns.join('_')}_${dto.unique ? 'uidx' : 'idx'}`;
     this.assertSafeIdentifier(indexName, 'index name');
-    const cols = dto.columns.map((c) => `"${c}"`).join(', ');
-    const unique = dto.unique ? 'UNIQUE ' : '';
+
+    const method = dto.method ?? 'btree';
+    if (method !== 'btree' && method !== 'hnsw' && method !== 'ivfflat') {
+      throw new BadRequestException(`Unsupported index method: ${method}`);
+    }
+
+    if ((method === 'hnsw' || method === 'ivfflat') && dto.unique) {
+      throw new BadRequestException(
+        'Unique indexes are not supported with HNSW/IVFFlat',
+      );
+    }
+
+    const ops = dto.ops ?? 'vector_cosine_ops';
+    if (
+      (method === 'hnsw' || method === 'ivfflat') &&
+      ![
+        'vector_cosine_ops',
+        'vector_l2_ops',
+        'vector_ip_ops',
+      ].includes(ops)
+    ) {
+      throw new BadRequestException(`Unsupported vector ops: ${ops}`);
+    }
+
+    if (method === 'hnsw' || method === 'ivfflat') {
+      await this.projectsService.ensureVectorExtension();
+    }
+
+    const unique = dto.unique && method === 'btree' ? 'UNIQUE ' : '';
+    const colSql =
+      method === 'hnsw' || method === 'ivfflat'
+        ? dto.columns.map((c) => `"${c}" ${ops}`).join(', ')
+        : dto.columns.map((c) => `"${c}"`).join(', ');
+
     await this.drizzle.db.execute(
-      `CREATE ${unique}INDEX "${indexName}" ON "${schema}"."${tableName}" (${cols})`,
+      `CREATE ${unique}INDEX "${indexName}" ON "${schema}"."${tableName}" USING ${method} (${colSql})`,
     );
   }
 

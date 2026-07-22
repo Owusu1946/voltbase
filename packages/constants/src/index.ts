@@ -24,7 +24,21 @@ export const COLUMN_TYPES = [
   'uuid',
   'jsonb',
   'numeric',
+  'vector',
 ] as const;
+
+/** Default embedding dimensions (OpenAI text-embedding-3-small). */
+export const DEFAULT_VECTOR_DIMENSIONS = 1536;
+
+export const VECTOR_INDEX_METHODS = ['btree', 'hnsw', 'ivfflat'] as const;
+export type VectorIndexMethod = (typeof VECTOR_INDEX_METHODS)[number];
+
+export const VECTOR_INDEX_OPS = [
+  'vector_cosine_ops',
+  'vector_l2_ops',
+  'vector_ip_ops',
+] as const;
+export type VectorIndexOps = (typeof VECTOR_INDEX_OPS)[number];
 
 export const TABLE_EDITOR_INTENT = {
   CREATE_TABLE: 'CREATE_TABLE',

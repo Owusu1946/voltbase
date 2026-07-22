@@ -83,6 +83,7 @@ export function SchemaConstraintsPanel({
         <IndexesTab
           indexes={indexes}
           columnNames={columnNames}
+          hasVectorColumn={tableInfo.columns.some((c) => c.type === 'vector')}
           disabled={isPending}
           onCreate={(body) =>
             run(() =>
@@ -168,23 +169,31 @@ export function SchemaConstraintsPanel({
 function IndexesTab({
   indexes,
   columnNames,
+  hasVectorColumn,
   disabled,
   onCreate,
   onDrop,
 }: {
   indexes: TableInfo['indexes'];
   columnNames: string[];
+  hasVectorColumn: boolean;
   disabled: boolean;
   onCreate: (body: {
     name?: string;
     columns: string[];
     unique?: boolean;
+    method?: string;
+    ops?: string;
   }) => void;
   onDrop: (name: string) => void;
 }) {
   const [columns, setColumns] = useState(columnNames[0] ?? '');
   const [unique, setUnique] = useState(false);
   const [name, setName] = useState('');
+  const [method, setMethod] = useState(
+    hasVectorColumn ? 'hnsw' : 'btree',
+  );
+  const [ops, setOps] = useState('vector_cosine_ops');
 
   return (
     <div className="space-y-3">
@@ -197,7 +206,7 @@ function IndexesTab({
             <div className="min-w-0">
               <p className="truncate font-mono text-xs">{idx.name}</p>
               <p className="text-xs text-muted-foreground">
-                ({idx.columns.join(', ')})
+                {idx.method ? `${idx.method} · ` : ''}({idx.columns.join(', ')})
                 {idx.unique ? ' · unique' : ''}
                 {idx.primary ? ' · primary' : ''}
               </p>
@@ -219,7 +228,7 @@ function IndexesTab({
           <p className="text-xs text-muted-foreground">No indexes</p>
         ) : null}
       </ul>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1">
           <Label className="text-xs">Columns (comma-separated)</Label>
           <Input
@@ -229,18 +238,52 @@ function IndexesTab({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Name (optional)</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Label className="text-xs">Method</Label>
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-xs"
+            value={method}
+            onChange={(e) => setMethod(e.target.value)}
+          >
+            <option value="btree">btree</option>
+            <option value="hnsw">hnsw (vector)</option>
+            <option value="ivfflat">ivfflat (vector)</option>
+          </select>
         </div>
+        {method === 'hnsw' || method === 'ivfflat' ? (
+          <div className="space-y-1">
+            <Label className="text-xs">Ops</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-xs"
+              value={ops}
+              onChange={(e) => setOps(e.target.value)}
+            >
+              <option value="vector_cosine_ops">vector_cosine_ops</option>
+              <option value="vector_l2_ops">vector_l2_ops</option>
+              <option value="vector_ip_ops">vector_ip_ops</option>
+            </select>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <Label className="text-xs">Name (optional)</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+        )}
         <div className="flex items-end gap-2">
-          <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={unique}
-              onChange={(e) => setUnique(e.target.checked)}
-            />
-            Unique
-          </label>
+          {method === 'btree' ? (
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={unique}
+                onChange={(e) => setUnique(e.target.checked)}
+              />
+              Unique
+            </label>
+          ) : (
+            <div className="min-w-0 flex-1 space-y-1">
+              <Label className="text-xs">Name (optional)</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
           <Button
             type="button"
             size="sm"
@@ -248,8 +291,14 @@ function IndexesTab({
             onClick={() =>
               onCreate({
                 name: name || undefined,
-                columns: columns.split(',').map((c) => c.trim()).filter(Boolean),
-                unique,
+                columns: columns
+                  .split(',')
+                  .map((c) => c.trim())
+                  .filter(Boolean),
+                unique: method === 'btree' ? unique : false,
+                method,
+                ops:
+                  method === 'hnsw' || method === 'ivfflat' ? ops : undefined,
               })
             }
           >

@@ -20,6 +20,7 @@ vb.from('t').insert({ … })
 vb.from('t').eq('id', id).update({ … })
 vb.from('t').eq('id', id).delete()
 vb.rpc('fn', { arg: 1 })
+vb.rpc('match_documents', { query_embedding, match_threshold, match_count })
 
 // Auth
 vb.auth.signUp / signIn / sendMagicLink
